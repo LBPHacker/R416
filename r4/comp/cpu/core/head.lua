@@ -14,29 +14,30 @@ return testbed.module(function(params)
 	local inputs = {
 		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "pc_hi"           , index =  3             , keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "lhs_lo_" .. units, index =  6 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "lhs_hi_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "rhs_lo_" .. units, index = 10 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "rhs_hi_" .. units, index = 12 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "instr_"  .. units, index = 14 + units * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 },
+		{ name = "defer"           , index =  5             , keepalive = 0x10000000, payload = 0x00000001, initial = 0x10000000 },
+		{ name = "lhs_lo_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+		{ name = "lhs_hi_" .. units, index = 10 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+		{ name = "rhs_lo_" .. units, index = 12 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+		{ name = "rhs_hi_" .. units, index = 14 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+		{ name = "instr_"  .. units, index = 16 + units * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 },
 	}
 	local outputs = {
 		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "pc_hi"           , index =  3             , keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "lhs_lo_" .. units, index =  6 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "lhs_hi_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "rhs_lo_" .. units, index = 10 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "rhs_hi_" .. units, index = 12 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "instr_"  .. units, index = 14 + units * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC },
+		{ name = "lhs_lo_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
+		{ name = "lhs_hi_" .. units, index = 10 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
+		{ name = "rhs_lo_" .. units, index = 12 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
+		{ name = "rhs_hi_" .. units, index = 14 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
+		{ name = "instr_"  .. units, index = 16 + units * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC },
 	}
 	for ix_unit = 0, units - 1 do
-		table.insert(inputs , { name = "lhs_lo_" .. ix_unit, index =  6 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
-		table.insert(inputs , { name = "lhs_hi_" .. ix_unit, index =  8 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
-		table.insert(inputs , { name = "rhs_lo_" .. ix_unit, index = 10 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
-		table.insert(inputs , { name = "rhs_hi_" .. ix_unit, index = 12 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
-		table.insert(inputs , { name = "instr_"  .. ix_unit, index = 14 + ix_unit * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 })
-		table.insert(outputs, { name = "res_lo_" .. ix_unit, index =  6 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
-		table.insert(outputs, { name = "res_hi_" .. ix_unit, index =  8 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
+		table.insert(inputs , { name = "lhs_lo_" .. ix_unit, index =  8 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
+		table.insert(inputs , { name = "lhs_hi_" .. ix_unit, index = 10 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
+		table.insert(inputs , { name = "rhs_lo_" .. ix_unit, index = 12 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
+		table.insert(inputs , { name = "rhs_hi_" .. ix_unit, index = 14 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
+		table.insert(inputs , { name = "instr_"  .. ix_unit, index = 16 + ix_unit * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 })
+		table.insert(outputs, { name = "res_lo_" .. ix_unit, index =  8 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
+		table.insert(outputs, { name = "res_hi_" .. ix_unit, index = 10 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
 	end
 	return {
 		tag = "core.head",
@@ -60,7 +61,7 @@ return testbed.module(function(params)
 				})
 			end
 			local outputs = {}
-			local defer
+			local defer = inputs.defer
 			local pc_lo = inputs.pc_lo
 			local pc_hi = inputs.pc_hi
 			for ix_unit = 0, units - 1 do
@@ -133,6 +134,7 @@ return testbed.module(function(params)
 			local inputs = {
 				pc_lo                  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				pc_hi                  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
+				defer                  = bitx.bor(math.random(0x0000, 0x0001), 0x10000000),
 				[ "lhs_lo_" .. units ] = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				[ "lhs_hi_" .. units ] = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				[ "rhs_lo_" .. units ] = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
@@ -160,7 +162,7 @@ return testbed.module(function(params)
 				end
 			end
 			local outputs = {}
-			local defer
+			local defer = inputs.defer
 			local pc_lo = inputs.pc_lo
 			local pc_hi = inputs.pc_hi
 			for ix_unit = 0, units - 1 do

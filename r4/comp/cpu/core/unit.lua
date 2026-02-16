@@ -8,8 +8,7 @@ local incr_pc   = require("r4.comp.cpu.core.incr_pc").instantiate()
 
 return testbed.module(function(params, params_name)
 	check.one_of(params_name .. ".unit_type", params.unit_type, { "f", "m", "l" })
-	local has_defer_in = params.unit_type == "m"
-	local has_jal      = params.unit_type == "l"
+	local has_jal = params.unit_type == "l"
 
 	local alu_instance = alu.instantiate(params, params_name)
 
@@ -20,6 +19,7 @@ return testbed.module(function(params, params_name)
 		{ name = "rhs_hi"  , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "pc_lo"   , index =  9, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "pc_hi"   , index = 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+		{ name = "defer"   , index = 13, keepalive = 0x10000000, payload = 0x00000001, initial = 0x10000000 },
 		{ name = "instr_lo", index = 27, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "instr_hi", index = 29, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 	}
@@ -32,9 +32,6 @@ return testbed.module(function(params, params_name)
 		{ name = "output", index = 11, keepalive = 0x10000000, payload = 0x00000001 },
 		{ name = "taken" , index = 23, keepalive = 0x10000000, payload = 0x00000001 },
 	}
-	if has_defer_in then
-		table.insert(inputs, { name = "defer", index = 13, keepalive = 0x10000000, payload = 0x00000001, initial = 0x10000000 })
-	end
 	if has_jal then
 		table.insert(outputs, { name = "jal_lo", index = 25, keepalive = 0x10000000, payload = 0x0000FFFF })
 		table.insert(outputs, { name = "jal_hi", index = 27, keepalive = 0x10000000, payload = 0x0000FFFF })
@@ -109,13 +106,13 @@ return testbed.module(function(params, params_name)
 				ltu      = alu_outputs.ltu,
 				eq       = alu_outputs.eq,
 			})
-			local defer = cbranch_outputs.taken
-			if has_defer_in then
-				defer = defer:bor(inputs.defer)
+			local defer = inputs.defer
+			if not has_jal then
+				defer = defer:bor(cbranch_outputs.taken)
+				             :bor(instr_mem:bxor(1))
+				             :bor(instr_mul:bxor(1))
+				             :bor(instr_hltj:bxor(1)):band(0x10000001)
 			end
-			defer = defer:bor(instr_mem:bxor(1))
-			             :bor(instr_mul:bxor(1))
-			             :bor(instr_hltj:bxor(1)):band(0x10000001)
 			local output = defer:bxor(1):bsub(instr_output)
 			local incr_pc_outputs = incr_pc.component({
 				lo = inputs.pc_lo,
@@ -171,7 +168,7 @@ return testbed.module(function(params, params_name)
 				instr       = instr,
 				instr_lo    = bitx.bor(instr_lo, 0x10000000),
 				instr_hi    = bitx.bor(instr_hi, 0x10000000),
-				defer       = has_defer_in and bitx.bor(math.random(0x0000, 0x0001), 0x10000000) or nil,
+				defer       = bitx.bor(math.random(0x0000, 0x0001), 0x10000000),
 			}
 			if not has_jal then
 				inputs.next_lhs_lo = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000)
@@ -188,13 +185,9 @@ return testbed.module(function(params, params_name)
 			local instr_jalr = bitx.band(inputs.instr_lo, 0x005C) == 0x0044
 			local instr_jal  = bitx.band(inputs.instr_lo, 0x0058) == 0x0048
 			local instr_hlt  = bitx.band(inputs.instr_lo, 0x0050) == 0x0050
-			local defer = instr_mem or
-			              instr_mul or
-			              instr_jalr or
-			              instr_jal or
-			              instr_hlt
-			if has_defer_in then
-				defer = defer or bitx.band(inputs.defer, 1) ~= 0
+			local defer = bitx.band(inputs.defer, 1) ~= 0
+			if not has_jal then
+				defer = defer or instr_mem or instr_mul or instr_jalr or instr_jal or instr_hlt
 			end
 			local output = bitx.band(inputs.instr_lo, 0x0050) == 0x0010
 			local pc = bitx.bor(bitx.band(inputs.pc_lo, 0xFFFF), bitx.lshift(bitx.band(inputs.pc_hi, 0xFFFF), 16))
@@ -233,7 +226,7 @@ return testbed.module(function(params, params_name)
 				return nil, "cbranch: " .. err
 			end
 			local cbranch_taken = bitx.band(cbranch_outputs.taken, 1) ~= 0
-			if cbranch_taken then
+			if cbranch_taken and not has_jal then
 				defer = true
 			end
 			local next_lhs_lo = inputs.lhs_lo

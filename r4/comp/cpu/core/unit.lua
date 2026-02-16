@@ -18,16 +18,15 @@ return testbed.module(function(params, params_name)
 		{ name = "lhs_hi"  , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "rhs_lo"  , index =  5, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "rhs_hi"  , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "pc_lo"   , index =  9, keepalive = 0x10000000, payload = 0x0000FFFC, initial = 0x10000000 },
+		{ name = "pc_lo"   , index =  9, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "pc_hi"   , index = 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-		{ name = "instr"   , index = 15, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 },
 		{ name = "instr_lo", index = 27, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "instr_hi", index = 29, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 	}
 	local outputs = {
 		{ name = "res_lo", index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "res_hi", index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "pc_lo" , index =  5, keepalive = 0x10000000, payload = 0x0000FFFC },
+		{ name = "pc_lo" , index =  5, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "pc_hi" , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "defer" , index =  9, keepalive = 0x10000000, payload = 0x00000001 },
 		{ name = "output", index = 11, keepalive = 0x10000000, payload = 0x00000001 },
@@ -40,6 +39,7 @@ return testbed.module(function(params, params_name)
 		table.insert(outputs, { name = "jal_lo", index = 25, keepalive = 0x10000000, payload = 0x0000FFFF })
 		table.insert(outputs, { name = "jal_hi", index = 27, keepalive = 0x10000000, payload = 0x0000FFFF })
 	else
+		table.insert(inputs, { name = "instr"      , index = 15, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 })
 		table.insert(inputs, { name = "next_lhs_lo", index = 17, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
 		table.insert(inputs, { name = "next_lhs_hi", index = 19, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
 		table.insert(inputs, { name = "next_rhs_lo", index = 21, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 })
@@ -166,7 +166,7 @@ return testbed.module(function(params, params_name)
 				lhs_hi      = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				rhs_lo      = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				rhs_hi      = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
-				pc_lo       = bitx.bor(bitx.lshift(math.random(0x0000, 0x3FFF), 2), 0x10000000),
+				pc_lo       = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				pc_hi       = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				instr       = instr,
 				instr_lo    = bitx.bor(instr_lo, 0x10000000),

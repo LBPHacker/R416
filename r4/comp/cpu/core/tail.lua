@@ -22,7 +22,7 @@ return testbed.module(function(params)
 		storage_slots = 90,
 		work_slots    = 30,
 		inputs = {
-			{ name = "pc_lo" , index =  1, keepalive = 0x10000000, payload = 0x0000FFFC, initial = 0x10000000 },
+			{ name = "pc_lo" , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 			{ name = "pc_hi" , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 			{ name = "lhs_lo", index =  6, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 			{ name = "lhs_hi", index =  8, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
@@ -31,7 +31,7 @@ return testbed.module(function(params)
 			{ name = "instr" , index = 14, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 },
 		},
 		outputs = {
-			{ name = "pc_lo"  , index =  1, keepalive = 0x10000000, payload = 0x0000FFFC },
+			{ name = "pc_lo"  , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "pc_hi"  , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "res_lo" , index =  5, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "res_hi" , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF },
@@ -72,12 +72,12 @@ return testbed.module(function(params)
 			})
 			local pc_lo, pc_hi = spaghetti.select(
 				unit_outputs.taken:bor(instr_jalr:bxor(1)):band(1):zeroable(),
-				address_outputs.sum_lo:bsub(3), unit_outputs.pc_lo,
+				address_outputs.sum_lo, unit_outputs.pc_lo,
 				address_outputs.sum_hi, unit_outputs.pc_hi
 			)
 			pc_lo, pc_hi = spaghetti.select(
 				instr_jal:band(1):zeroable(),
-				pc_lo, unit_outputs.jal_lo:bsub(3),
+				pc_lo, unit_outputs.jal_lo,
 				pc_hi, unit_outputs.jal_hi
 			)
 			return {
@@ -91,7 +91,7 @@ return testbed.module(function(params)
 		end,
 		fuzz_inputs = function()
 			return {
-				pc_lo  = bitx.bor(bitx.lshift(math.random(0x0000, 0x3FFF), 2), 0x10000000),
+				pc_lo  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				pc_hi  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				lhs_lo = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				lhs_hi = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
@@ -144,7 +144,7 @@ return testbed.module(function(params)
 				pc_hi = branch_hi
 			end
 			return {
-				pc_lo   = bitx.band(pc_lo, 0xFFFFFFFC),
+				pc_lo   = pc_lo,
 				pc_hi   = pc_hi,
 				res_lo  = unit_outputs.res_lo,
 				res_hi  = unit_outputs.res_hi,

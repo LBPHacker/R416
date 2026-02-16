@@ -36,7 +36,7 @@ local function incr16(expr, ignore2lsb, decr)
 		inv = inv:bxor(0x1FFFF)
 	end
 	if ignore2lsb then
-		inv = inv:bxor(3)
+		inv = inv:bsub(3)
 	end
 	local flip = spaghetti.constant(0x3FFFFFFE):lshift(inv):never_zero():bxor(0x1FFFF)
 	if ignore2lsb then

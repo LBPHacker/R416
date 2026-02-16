@@ -12,7 +12,7 @@ return testbed.module(function(params)
 
 	local units = 3
 	local inputs = {
-		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFC, initial = 0x10000000 },
+		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "pc_hi"           , index =  3             , keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "lhs_lo_" .. units, index =  6 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		{ name = "lhs_hi_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
@@ -21,7 +21,7 @@ return testbed.module(function(params)
 		{ name = "instr_"  .. units, index = 14 + units * 11, keepalive = 0x00000003, payload = 0xFFFFFFFC, initial = 0x00000001 },
 	}
 	local outputs = {
-		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFC },
+		{ name = "pc_lo"           , index =  1             , keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "pc_hi"           , index =  3             , keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "lhs_lo_" .. units, index =  6 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "lhs_hi_" .. units, index =  8 + units * 11, keepalive = 0x10000000, payload = 0x0000FFFF },
@@ -131,7 +131,7 @@ return testbed.module(function(params)
 		end,
 		fuzz_inputs = function()
 			local inputs = {
-				pc_lo                  = bitx.bor(bitx.lshift(math.random(0x0000, 0x3FFF), 2), 0x10000000),
+				pc_lo                  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				pc_hi                  = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				[ "lhs_lo_" .. units ] = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),
 				[ "lhs_hi_" .. units ] = bitx.bor(math.random(0x0000, 0xFFFF), 0x10000000),

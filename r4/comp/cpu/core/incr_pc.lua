@@ -17,23 +17,23 @@ return testbed.module(function(params)
 		storage_slots = 40,
 		work_slots    = 20,
 		inputs = {
-			{ name = "lo", index = 1, keepalive = 0x10000000, payload = 0x0000FFFC, initial = 0x10000000 },
+			{ name = "lo", index = 1, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 			{ name = "hi", index = 3, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
 		},
 		outputs = {
-			{ name = "lo", index = 1, keepalive = 0x10000000, payload = 0x0000FFFC },
+			{ name = "lo", index = 1, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "hi", index = 3, keepalive = 0x10000000, payload = 0x0000FFFF },
 		},
 		func = function(inputs)
 			local lo_incr = common.incr16(inputs.lo,  true, false)
 			local hi_incr = common.incr16(inputs.hi, false, false)
 			return {
-				lo = lo_incr:band(0x1000FFFF):bsub(3),
+				lo = lo_incr:band(0x1000FFFF),
 				hi = spaghetti.select(lo_incr:band(0x10000):zeroable(), hi_incr:band(0x1000FFFF), inputs.hi),
 			}
 		end,
 		fuzz_inputs = function()
-			local value = bitx.lshift(math.random(0x00000000, 0x3FFFFFFF), 2)
+			local value = bitx.bor(math.random(0x0000, 0xFFFF), bitx.lshift(math.random(0x0000, 0xFFFF), 16))
 			local random = math.random(0, 15)
 			if random < 5 then
 				value = (random - 3) * 4

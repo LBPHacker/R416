@@ -28,7 +28,6 @@ return testbed.module(function(params, params_name)
 		{ name = "res_hi", index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "pc_lo" , index =  5, keepalive = 0x10000000, payload = 0x0000FFFF },
 		{ name = "pc_hi" , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF },
-		{ name = "defer" , index =  9, keepalive = 0x10000000, payload = 0x00000001 },
 		{ name = "output", index = 11, keepalive = 0x10000000, payload = 0x00000001 },
 		{ name = "taken" , index = 23, keepalive = 0x10000000, payload = 0x00000001 },
 	}
@@ -142,7 +141,6 @@ return testbed.module(function(params, params_name)
 				res_hi      = alu_outputs.res_hi,
 				pc_lo       = pc_lo,
 				pc_hi       = pc_hi,
-				defer       = defer,
 				output      = output,
 				next_lhs_lo = next_lhs_lo,
 				next_lhs_hi = next_lhs_hi,
@@ -251,7 +249,6 @@ return testbed.module(function(params, params_name)
 				pc_lo       = bitx.bor(0x10000000, bitx.band(            pc     , 0xFFFF)),
 				pc_hi       = bitx.bor(0x10000000, bitx.band(bitx.rshift(pc, 16), 0xFFFF)),
 				output      = output and 0x10000001 or 0x10000000,
-				defer       = defer and 0x10000001 or 0x10000000,
 				next_lhs_lo = not has_jal and next_lhs_lo or nil,
 				next_lhs_hi = not has_jal and next_lhs_hi or nil,
 				next_rhs_lo = not has_jal and next_rhs_lo or nil,

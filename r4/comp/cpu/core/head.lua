@@ -61,7 +61,6 @@ return testbed.module(function(params)
 				})
 			end
 			local outputs = {}
-			local defer = inputs.defer
 			local pc_lo = inputs.pc_lo
 			local pc_hi = inputs.pc_hi
 			for ix_unit = 0, units - 1 do
@@ -76,7 +75,7 @@ return testbed.module(function(params)
 					rhs_hi      = inputs["rhs_hi_" .. ix_unit],
 					pc_lo       = pc_lo,
 					pc_hi       = pc_hi,
-					defer       = defer,
+					defer       = inputs.defer,
 					instr       = instr,
 					instr_lo    = instr_split_outputs.instr_lo,
 					instr_hi    = instr_split_outputs.instr_hi,
@@ -93,7 +92,6 @@ return testbed.module(function(params)
 				inputs["instr_"  .. (ix_unit + 1)]  = unit_outputs.next_instr
 				pc_lo  = unit_outputs.pc_lo
 				pc_hi  = unit_outputs.pc_hi
-				defer  = unit_outputs.defer
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
 				for ix_next_unit = ix_unit + 1, units do
@@ -162,7 +160,6 @@ return testbed.module(function(params)
 				end
 			end
 			local outputs = {}
-			local defer = inputs.defer
 			local pc_lo = inputs.pc_lo
 			local pc_hi = inputs.pc_hi
 			for ix_unit = 0, units - 1 do
@@ -180,7 +177,7 @@ return testbed.module(function(params)
 					rhs_hi      = inputs["rhs_hi_" .. ix_unit],
 					pc_lo       = pc_lo,
 					pc_hi       = pc_hi,
-					defer       = defer,
+					defer       = inputs.defer,
 					instr       = instr,
 					instr_lo    = instr_split_outputs.instr_lo,
 					instr_hi    = instr_split_outputs.instr_hi,
@@ -200,7 +197,6 @@ return testbed.module(function(params)
 				inputs["instr_"  .. (ix_unit + 1)] = unit_outputs.next_instr
 				pc_lo = unit_outputs.pc_lo
 				pc_hi = unit_outputs.pc_hi
-				defer = unit_outputs.defer
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
 				for ix_next_unit = ix_unit + 1, units do

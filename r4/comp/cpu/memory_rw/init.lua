@@ -25,10 +25,10 @@ return testbed.module(function(params)
 			{ name = "mem_lsb" , index = 37, keepalive = 0x00000000, payload = 0xFFFFFFFF, initial = 0x20000000, never_zero = true },
 		},
 		outputs = {
-			{ name = "core_lo" , index = 1, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "core_hi" , index = 3, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "mem_rest", index = 5, keepalive = 0x00000001, payload = 0xFFFFFFFE },
-			{ name = "mem_lsb" , index = 7, keepalive = 0x10000000, payload = 0x00000001 },
+			{ name = "core_lo" , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "core_hi" , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "mem_rest", index = 34, keepalive = 0x00000001, payload = 0xFFFFFFFE },
+			{ name = "mem_lsb" , index = 35, keepalive = 0x10000000, payload = 0x00000001 },
 		},
 		func = function(inputs)
 			local mem_in_lo = inputs.mem_rest:bor(0x10000000):band(0x1000FFFF):force(0x10000000, 0x0000FFFF):bsub(1):bor(inputs.mem_lsb:bor(0x10000000):band(0x10000001))

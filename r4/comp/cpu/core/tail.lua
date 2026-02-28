@@ -36,11 +36,15 @@ return testbed.module(function(params)
 			{ name = "pc_hi"  , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "res_lo" , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF },
 			{ name = "res_hi" , index =  9, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "addr_lo", index = 11, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "addr_hi", index = 13, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "res_rd" , index = 11, keepalive = 0x10000000, payload = 0x0000001F },
+			{ name = "addr_lo", index = 13, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "addr_hi", index = 15, keepalive = 0x10000000, payload = 0x0000FFFF },
 		},
 		func = function(inputs)
 			local instr_split_outputs = instr_split.component({
+				instr = inputs.instr,
+			})
+			local regs_outputs = regs.component({
 				instr = inputs.instr,
 			})
 			local instr_2    = spaghetti.rshiftk(instr_split_outputs.instr_lo, 2)
@@ -87,6 +91,7 @@ return testbed.module(function(params)
 				pc_hi   = pc_hi,
 				res_lo  = unit_outputs.res_lo,
 				res_hi  = unit_outputs.res_hi,
+				res_rd  = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs.rd, 0x10000000),
 				addr_lo = address_outputs.sum_lo,
 				addr_hi = address_outputs.sum_hi,
 			}
@@ -107,11 +112,17 @@ return testbed.module(function(params)
 			local instr_split_outputs, err = instr_split.fuzz_outputs({
 				instr = inputs.instr,
 			})
-			local instr_jal  = bitx.band(instr_split_outputs.instr_lo, 0x0058) == 0x0048
-			local instr_jalr = bitx.band(instr_split_outputs.instr_lo, 0x005C) == 0x0044
 			if not instr_split_outputs then
 				return nil, "instr_split: " .. err
 			end
+			local regs_outputs, err = regs.fuzz_outputs({
+				instr = inputs.instr,
+			})
+			if not regs_outputs then
+				return nil, "regs: " .. err
+			end
+			local instr_jal  = bitx.band(instr_split_outputs.instr_lo, 0x0058) == 0x0048
+			local instr_jalr = bitx.band(instr_split_outputs.instr_lo, 0x005C) == 0x0044
 			local unit_outputs, err = unit_last.fuzz_outputs({
 				lhs_lo   = inputs.lhs_lo,
 				lhs_hi   = inputs.lhs_hi,
@@ -152,6 +163,7 @@ return testbed.module(function(params)
 				pc_hi   = pc_hi,
 				res_lo  = unit_outputs.res_lo,
 				res_hi  = unit_outputs.res_hi,
+				res_rd  = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs.rd or 0x10000000,
 				addr_lo = address_outputs.sum_lo,
 				addr_hi = address_outputs.sum_hi,
 			}

@@ -25,9 +25,9 @@ local function build_internal(params)
 	local eu_spacing = 20
 	local eus        = 2
 
-	if false then -- memory
-		local x_body           = 10
-		local y_body           = 10
+	local x_body = 10
+	local y_body = 10
+	if true then -- memory
 		local height           = 64
 		local width_order      = 7
 		local max_height_order = 6
@@ -49,13 +49,18 @@ local function build_internal(params)
 				part(memory32({ x = x_body + x, y = y_body + y }, 0xDEAD0000 + y * width + x))
 			end
 			local x_dmnd = x_body + width
+			local last_filt
 			if y == 0 then
 				for i = 0, 5 do
-					part({ type = pt.FILT, x = x_dmnd, y = y_body + y, ctype = 0x0000006F, life = 4 }) -- jal r0, 0
+					last_filt = part({ type = pt.FILT, x = x_dmnd, y = y_body + y, ctype = 0x0000006F, life = 4 }) -- jal r0, 0
 					x_dmnd = x_dmnd + 1
 				end
 			end
-			part({ type = pt.DMND, x = x_dmnd, y = y_body + y, unstack = true })
+			local last_dmnd = part({ type = pt.DMND, x = x_dmnd, y = y_body + y, unstack = true })
+			if y == 0 then
+				last_filt.dcolour = 0xFFFFFFFF
+				last_dmnd.dcolour = 0xFFFFFFFF
+			end
 			part({ type = pt.STOR, x = x_body - 1, y = y_body + y })
 			local y_aray = y_body + (height - 1 - y)
 			aray(x_body - 2 - ((y + 1) % 2 * 3), y_aray, -1, 0, pt.METL, nil, 988)
@@ -198,7 +203,7 @@ local function build_internal(params)
 			part({ type = pt.FILT, x = x_left -  8, y = y_bank + 1, ctype = 0x10000003 })
 			part     ({ type = pt.INSL, x = x_bank + width + 3, y = y_bank - 1 })
 			part     ({ type = pt.INSL, x = x_left - 10, y = y_bank })
-			apom_part({ type = pt.PSTN, x = x_left -  9, y = y_bank, extend = math.huge, debug_dcolour = 0xFFFF0000 }, "vert_write_in", "vert_write_dray")
+			apom_part({ type = pt.PSTN, x = x_left -  9, y = y_bank, extend = math.huge, debug_dcolour = 0xFFFF0000, tmp = 8 }, "vert_write_in", "vert_write_dray")
 			spark    ({ type = pt.NSCN, x = x_left -  9, y = y_bank + 1 })
 			part     ({ type = pt.PSTN, x = x_left -  8, y = y_bank, extend = 0, debug_dcolour = 0xFF00FF00 })
 			apom_part({ type = pt.PSTN, x = x_left -  7, y = y_bank, extend = 1, debug_dcolour = 0xFFFF0000 }, "vert_read_finish", "vert_read_ldtc3")
@@ -244,7 +249,7 @@ local function build_internal(params)
 			apom_add_prev("fetch_3", "fetch_2")
 			apom_add_prev("fetch_4", "fetch_3")
 
-			part({ type = pt.INSL, x = x_fetch + width + 7, y = y_fetch - 1, unstack = true })
+			part({ type = pt.INSL, x = x_fetch + width + 7, y = y_fetch - 1, unstack = true, dcolour = 0xFFFFFFFF })
 			part({ type = pt.INSL, x = x_fetch - 20, y = y_fetch + 1 })
 			part({ type = pt.INSL, x = x_fetch - 18, y = y_fetch + 1 })
 			part({ type = pt.INSL, x = x_fetch - 16, y = y_fetch + 1 })
@@ -272,7 +277,7 @@ local function build_internal(params)
 			part({ type = pt.PSTN, x = x_fetch - 21, y = y_fetch, extend = 64, debug_dcolour = 0xFF007FFF })
 			apom_part({ type = pt.PSTN, x = x_fetch - 22, y = y_fetch, extend = 1, debug_dcolour = 0xFFFF0000 }, "fetch_out", "vert_write_in")
 			part({ type = pt.PSTN, x = x_fetch - 23, y = y_fetch, extend =  0, debug_dcolour = 0xFF00FF00 })
-			apom_part({ type = pt.PSTN, x = x_fetch - 24, y = y_fetch, extend = math.huge, debug_dcolour = 0xFFFF0000 }, "fetch_in", "fetch_4")
+			apom_part({ type = pt.PSTN, x = x_fetch - 24, y = y_fetch, extend = math.huge, debug_dcolour = 0xFFFF0000, tmp = 8 }, "fetch_in", "fetch_4")
 			part({ type = pt.INSL, x = x_fetch - 25, y = y_fetch })
 		end
 
@@ -731,12 +736,12 @@ local function build_internal(params)
 		end
 	end
 
-	do -- register access
+	if true then -- register access
 		local regs        = 32
 		local writers     = 4
 		local readers     = 8
-		local x_regs      = 106
-		local y_regs_base = 110
+		local x_regs      = 105
+		local y_regs_base = 111
 
 		local top_regs = {}
 		local prev_regs = {}
@@ -997,6 +1002,8 @@ local function build_internal(params)
 		end
 		part({ type = pt.PSTN, x = x_regmove_ballast, y = y_regmove_apom_top + 1, tmp = 64 })
 	end
+
+	ucontext.frame(x_body - 31, y_body - 1, x_body + 134, y_body + 200)
 
 	return parts
 end

@@ -38,6 +38,7 @@ return testbed.module(function(params)
 		table.insert(inputs , { name = "instr_"  .. ix_unit, index = 16 + ix_unit * 11, keepalive = 0x00000001, payload = 0xFFFFFFFE, initial = 0x00000001 })
 		table.insert(outputs, { name = "res_lo_" .. ix_unit, index =  8 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
 		table.insert(outputs, { name = "res_hi_" .. ix_unit, index = 10 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000FFFF })
+		table.insert(outputs, { name = "res_rd_" .. ix_unit, index = 12 + ix_unit * 11, keepalive = 0x10000000, payload = 0x0000001F })
 	end
 	return {
 		tag = "core.head",
@@ -94,6 +95,7 @@ return testbed.module(function(params)
 				pc_hi  = unit_outputs.pc_hi
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
+				outputs["res_rd_" .. ix_unit] = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs[ix_unit].rd, 0x10000000)
 				for ix_next_unit = ix_unit + 1, units do
 					local iw_lhs_outputs = internal_writer.component({
 						rs     = regs_outputs[ix_next_unit].rs1,
@@ -199,6 +201,7 @@ return testbed.module(function(params)
 				pc_hi = unit_outputs.pc_hi
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
+				outputs["res_rd_" .. ix_unit] = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs[ix_unit].rd or 0x10000000
 				for ix_next_unit = ix_unit + 1, units do
 					local iw_lhs_outputs, err = internal_writer.fuzz_outputs({
 						rs     = regs_outputs[ix_next_unit].rs1,

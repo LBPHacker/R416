@@ -33,14 +33,13 @@ return testbed.module(function(params)
 			{ name = "instr"   , index = 17, keepalive = 0x00000001, payload = 0xFFFFFFFE, initial = 0x00000001 },
 		},
 		outputs = {
-			{ name = "pc_lo"   , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "pc_hi"   , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "shutdown", index =  5, keepalive = 0x10000000, payload = 0x00000001 },
-			{ name = "res_lo"  , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "res_hi"  , index =  9, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "res_rd"  , index = 11, keepalive = 0x10000000, payload = 0x0000001F },
-			{ name = "addr_lo" , index = 13, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "addr_hi" , index = 15, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "pc_lo"         , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "pc_hi"         , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "shutdown"      , index =  5, keepalive = 0x10000000, payload = 0x00000001 },
+			{ name = "addr_lo"       , index =  7, keepalive = 0x10000000, payload = 0x03FFFFFF },
+			{ name = "res_lo_addr_hi", index =  9, keepalive = 0x10000000, payload = 0x07FFFFFF },
+			{ name = "res_hi"        , index = 11, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "res_rd"        , index = 13, keepalive = 0x10000000, payload = 0x0000001F },
 		},
 		func = function(inputs)
 			local instr_split_outputs = instr_split.component({
@@ -55,11 +54,15 @@ return testbed.module(function(params)
 			local instr_3i   = instr_3:bxor(1)
 			local instr_4    = spaghetti.rshiftk(instr_split_outputs.instr_lo, 4)
 			local instr_4i   = instr_4:bxor(1)
+			local instr_5    = spaghetti.rshiftk(instr_split_outputs.instr_lo, 5)
+			local instr_5i   = instr_5:bxor(1)
 			local instr_6    = spaghetti.rshiftk(instr_split_outputs.instr_lo, 6)
 			local instr_6i   = instr_6:bxor(1)
 			local instr_hlt  = instr_6i:bor(instr_4i)
 			local instr_jal  = instr_6i:bor(instr_4):bor(instr_3i)
 			local instr_jalr = instr_6i:bor(instr_4):bor(instr_3):bor(instr_2i)
+			local instr_l    = instr_6:bor(instr_5):bor(instr_4):bor(instr_2)
+			local instr_s    = instr_6:bor(instr_5i):bor(instr_4)
 			local unit_outputs = unit_last.component({
 				lhs_lo   = inputs.lhs_lo,
 				lhs_hi   = inputs.lhs_hi,
@@ -90,15 +93,21 @@ return testbed.module(function(params)
 				pc_lo, unit_outputs.jal_lo,
 				pc_hi, unit_outputs.jal_hi
 			)
+			local control_l =                   instr_l:bor(inputs.shutdown):bxor(1):bsub(0xFFFE)
+			local control_s = spaghetti.lshiftk(instr_s:bor(inputs.shutdown):bxor(1):bsub(0xFFFE), 1)
+			local memmode = spaghetti.rshiftk(instr_split_outputs.instr_lo, 12):bsub(8)
+			local addr_lo = address_outputs.sum_lo:bor(spaghetti.lshiftk(address_outputs.sum_hi:bsub(0xFF00):bor(0x1000), 16))
+			                                      :bor(spaghetti.lshiftk(control_l:bor(control_s):bor(0x10), 24))
+			local res_lo_addr_hi = unit_outputs.res_lo:bor(spaghetti.lshiftk(address_outputs.sum_hi:bsub(0xFF):bor(0x100000), 8))
+			                                          :bor(spaghetti.lshiftk(memmode:bor(0x10), 24))
 			return {
-				pc_lo    = pc_lo,
-				pc_hi    = pc_hi,
-				shutdown = inputs.shutdown:bor(instr_hlt:bxor(1)):bsub(inputs.start):bor(0x10000000):band(0x10000001),
-				res_lo   = unit_outputs.res_lo,
-				res_hi   = unit_outputs.res_hi,
-				res_rd   = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs.rd, 0x10000000),
-				addr_lo  = address_outputs.sum_lo,
-				addr_hi  = address_outputs.sum_hi,
+				pc_lo          = pc_lo,
+				pc_hi          = pc_hi,
+				shutdown       = inputs.shutdown:bor(instr_hlt:bxor(1)):bsub(inputs.start):bor(0x10000000):band(0x10000001),
+				addr_lo        = addr_lo,
+				res_lo_addr_hi = res_lo_addr_hi,
+				res_hi         = unit_outputs.res_hi,
+				res_rd         = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs.rd, 0x10000000),
 			}
 		end,
 		fuzz_inputs = function()
@@ -130,6 +139,8 @@ return testbed.module(function(params)
 			local instr_hlt  = bitx.band(instr_split_outputs.instr_lo, 0x0050) == 0x0050
 			local instr_jal  = bitx.band(instr_split_outputs.instr_lo, 0x0058) == 0x0048
 			local instr_jalr = bitx.band(instr_split_outputs.instr_lo, 0x005C) == 0x0044
+			local instr_l    = bitx.band(instr_split_outputs.instr_lo, 0x0074) == 0x0000
+			local instr_s    = bitx.band(instr_split_outputs.instr_lo, 0x0070) == 0x0020
 			local defer = inputs.shutdown
 			local unit_outputs, err = unit_last.fuzz_outputs({
 				lhs_lo   = inputs.lhs_lo,
@@ -173,15 +184,34 @@ return testbed.module(function(params)
 			if bitx.band(inputs.start, 1) ~= 0 then
 				shutdown = false
 			end
+			local memmode = bitx.band(bitx.rshift(instr_split_outputs.instr_lo, 12), 7)
+			local control = 0
+			if bitx.band(defer, 1) == 0 then
+				if instr_l then
+					control = bitx.bor(control, 1)
+				end
+				if instr_s then
+					control = bitx.bor(control, 2)
+				end
+			end
+			local addr_lo = bitx.bor(
+				address_outputs.sum_lo,
+				bitx.lshift(bitx.band(address_outputs.sum_hi, 0xFF), 16),
+				bitx.lshift(control, 24)
+			)
+			local res_lo_addr_hi = bitx.bor(
+				unit_outputs.res_lo,
+				bitx.lshift(bitx.band(bitx.rshift(address_outputs.sum_hi, 8), 0xFF), 16),
+				bitx.lshift(memmode, 24)
+			)
 			return {
-				pc_lo    = pc_lo,
-				pc_hi    = pc_hi,
-				shutdown = shutdown and 0x10000001 or 0x10000000,
-				res_lo   = unit_outputs.res_lo,
-				res_hi   = unit_outputs.res_hi,
-				res_rd   = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs.rd or 0x10000000,
-				addr_lo  = address_outputs.sum_lo,
-				addr_hi  = address_outputs.sum_hi,
+				pc_lo          = pc_lo,
+				pc_hi          = pc_hi,
+				shutdown       = shutdown and 0x10000001 or 0x10000000,
+				addr_lo        = bitx.bor(addr_lo       , 0x10000000),
+				res_lo_addr_hi = bitx.bor(res_lo_addr_hi, 0x10000000),
+				res_hi         = unit_outputs.res_hi,
+				res_rd         = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs.rd or 0x10000000,
 			}
 		end,
 	}

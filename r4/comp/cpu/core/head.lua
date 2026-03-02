@@ -57,6 +57,7 @@ return testbed.module(function(params)
 		func = function(inputs)
 			local regs_outputs = {}
 			for ix_unit = 0, units do
+				inputs["instr_" .. ix_unit] = inputs["instr_" .. ix_unit]:bor(1)
 				regs_outputs[ix_unit] = regs.component({
 					instr = inputs["instr_" .. ix_unit],
 				})

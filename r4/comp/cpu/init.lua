@@ -3,6 +3,7 @@ local check     = require("spaghetti.check")
 local misc      = require("spaghetti.misc")
 local bitx      = require("spaghetti.bitx")
 local memory_rw = require("r4.comp.cpu.memory_rw.generated")
+local reg_r     = require("r4.comp.cpu.reg_r.generated")
 
 local audited_pairs = pairs
 
@@ -22,7 +23,7 @@ local function build_internal(params)
 	local cray          = ucontext.cray
 	local aray          = ucontext.aray
 
-	local eu_spacing       = 20
+	local eu_spacing       = 16
 	local eus              = 2
 	local height           = 64
 	local width_order      = 7
@@ -32,6 +33,11 @@ local function build_internal(params)
 	local y_body = 10
 	local x_bank = x_body
 	local y_bank = y_body + height + 2
+	local x_write_dray
+	local instr_fetch_1
+	local instr_fetch_2
+	local instr_fetch_3
+	local instr_fetch_4
 	if true then -- memory
 
 		local function memory32(p, value)
@@ -249,22 +255,22 @@ local function build_internal(params)
 			apom_add_prev("fetch_3", "fetch_2")
 			apom_add_prev("fetch_4", "fetch_3")
 
+			instr_fetch_1 = part({ type = pt.FILT, x = x_fetch     , y = y_fetch     })
+			instr_fetch_2 = part({ type = pt.FILT, x = x_fetch +  2, y = y_fetch     })
+			instr_fetch_3 = part({ type = pt.FILT, x = x_fetch +  4, y = y_fetch     })
+			instr_fetch_4 = part({ type = pt.FILT, x = x_fetch +  6, y = y_fetch     })
 			part({ type = pt.INSL, x = x_fetch + width + 7, y = y_fetch - 1, unstack = true, dcolour = 0xFFFFFFFF })
 			part({ type = pt.INSL, x = x_fetch - 20, y = y_fetch + 1 })
 			part({ type = pt.INSL, x = x_fetch - 18, y = y_fetch + 1 })
 			part({ type = pt.INSL, x = x_fetch - 16, y = y_fetch + 1 })
 			part({ type = pt.FRME, x = x_fetch -  1, y = y_fetch - 1 })
 			part({ type = pt.FRME, x = x_fetch -  1, y = y_fetch     })
-			part({ type = pt.FILT, x = x_fetch     , y = y_fetch     })
 			part({ type = pt.HEAC, x = x_fetch +  1, y = y_fetch - 1 })
 			part({ type = pt.HEAC, x = x_fetch +  1, y = y_fetch     })
-			part({ type = pt.FILT, x = x_fetch +  2, y = y_fetch     })
 			part({ type = pt.HEAC, x = x_fetch +  3, y = y_fetch - 1 })
 			part({ type = pt.HEAC, x = x_fetch +  3, y = y_fetch     })
-			part({ type = pt.FILT, x = x_fetch +  4, y = y_fetch     })
 			part({ type = pt.HEAC, x = x_fetch +  5, y = y_fetch - 1 })
 			part({ type = pt.HEAC, x = x_fetch +  5, y = y_fetch     })
-			part({ type = pt.FILT, x = x_fetch +  6, y = y_fetch     })
 			part({ type = pt.PSTN, x = x_fetch -  2, y = y_fetch, extend =  1, debug_dcolour = 0xFF007FFF })
 			for i = 0, width_order + max_height_order - 1 do
 				part({ type = pt.PSTN, x = x_fetch - 3 - i, y = y_fetch, extend = 0, debug_dcolour = 0xFF00FF00 })
@@ -319,7 +325,7 @@ local function build_internal(params)
 			local y_usage_next = y_usage + eu_spacing
 			local x_usage = x_body
 
-			local address_source = part({ type = pt.FILT, x = x_body - 2, y = y_usage - 10, tmp = 1, ctype = 0x11BA0BAD }) -- TODO
+			local address_source = part({ type = pt.FILT, x = x_body - 2, y = y_usage - 8, tmp = 1, ctype = 0x11BA0BAD }) -- TODO
 
 			local function assert_identical(a, b)
 				local function one_way(x, y)
@@ -511,6 +517,7 @@ local function build_internal(params)
 
 			local x_ldtc_1 = x_body + 127
 			local x_dray   = x_body + 128
+			x_write_dray = x_dray
 			local x_ldtc_2 = x_body + 129
 			local function x_storage_slot(index)
 				return x_core + 2 + index
@@ -535,13 +542,13 @@ local function build_internal(params)
 				end
 				ldtc(x_core + info.index + 2, y_usage - 2, source.x, source.y)
 			end
-			for _, info in ipairs({
-				{ name = "core_lo" , index = 1 },
-				{ name = "core_hi" , index = 3 },
-			}) do
-				part({ type = pt.FILT, x = x_core + info.index + 2, y = y_usage + 3 })
-				ldtc(x_core + info.index + 2, y_usage + 2, x_core + info.index + 2, y_usage)
-			end
+			-- for _, info in ipairs({
+			-- 	{ name = "core_lo" , index = 1 },
+			-- 	{ name = "core_hi" , index = 3 },
+			-- }) do
+			-- 	part({ type = pt.FILT, x = x_core + info.index + 2, y = y_usage + 3 })
+			-- 	ldtc(x_core + info.index + 2, y_usage + 2, x_core + info.index + 2, y_usage)
+			-- end
 
 			do
 				local x_apom = x_apom_read
@@ -553,7 +560,7 @@ local function build_internal(params)
 				dray(x_apom + 5, y_usage -1, x_ldtc_2, y_usage - 1, 1, pt.PSCN)
 				part ({ type = pt.LDTC, x = x_apom + 6, y = y_usage - 1, tmp = 1, life = y_usage - type_query_filt.y - 2 })
 
-				local y_finish = y_usage + 10
+				local y_finish = y_usage + 8
 				cray(x_ldtc_1, y_finish, x_ldtc_1, y_usage - 1, pt.SPRK, 1, pt.PSCN)
 				cray(x_ldtc_2, y_finish, x_ldtc_2, y_usage - 1, pt.SPRK, 1, pt.PSCN)
 				cray(x_ldtc_2 + 2, y_finish, x_apom + 2, y_finish, pt.CRMC, 2, pt.PSCN)
@@ -588,7 +595,7 @@ local function build_internal(params)
 				dray(x_dray, y_usage - 1, x_dray, y_usage + 1, 1, pt.PSCN)
 				cray(x_dray, y_usage - 1, x_dray, y_usage, pt.SPRK, 1, pt.PSCN)
 
-				local y_finish = y_usage + 11
+				local y_finish = y_usage + 9
 				part(mutate(template, { y = y_finish }))
 				dray(x_dray, y_finish + 1, template.x, template.y, 1, pt.PSCN)
 				cray(x_dray, y_finish + 1, template.x, template.y + 1, pt.SPRK, 1, pt.PSCN)
@@ -742,7 +749,7 @@ local function build_internal(params)
 		local readers     = 8
 
 		local x_regs      = x_bank + 95
-		local y_regs_base = y_bank + 35
+		local y_regs_base = y_bank + 33
 
 		local top_regs = {}
 		local prev_regs = {}
@@ -760,7 +767,7 @@ local function build_internal(params)
 			dray(top_regs[ix_reg].hi.x, top_regs[ix_reg].hi.y + eus * eu_spacing + 2, top_regs[ix_reg].hi.x, top_regs[ix_reg].hi.y + 1, 2, pt.PSCN)
 		end
 
-		local x_regmove_left        = x_regs - 83
+		local x_regmove_left        = x_regs - 63 - eu_spacing
 		local x_regmove_ballast     = x_regmove_left - 2
 		local y_regmove_apom_top    = y_regs_base - eu_spacing
 		local y_regmove_apom_bottom = y_regs_base + (eus - 1) * eu_spacing + 5
@@ -768,8 +775,8 @@ local function build_internal(params)
 		for ix_eu = 0, eus - 1 do -- usage site
 			local y_regs = y_regs_base + ix_eu * eu_spacing
 
-			local x_decode = x_regs + 17
-			local x_target = x_decode - 13 - eu_spacing
+			local x_decode = x_regs + 1
+			local x_target = x_regs + 4 - eu_spacing
 			local y_decode = y_regs - 3
 
 			for ix_reg = 0, regs - 1 do
@@ -796,18 +803,89 @@ local function build_internal(params)
 				part({ type = pt.LSNS, x = x_decode, y = y_decode, tmp = 3, tmp2 = lsns_distance or 1 })
 			end
 
+			local read_from = 6
+			local alloc_filt
+			do
+				local filt_allocs = {}
+				local first_x = x_decode + 2
+				function alloc_filt(x)
+					if not x then
+						x = first_x
+						while filt_allocs[x] do
+							x = x + 1
+						end
+					end
+					assert(not filt_allocs[x])
+					filt_allocs[x] = true
+					return x
+				end
+			end
+			alloc_filt(x_write_dray)
+
+			do
+				local x_core = x_regs - 81
+				local y_core = y_regs - 2
+				local remap = {}
+				for ix_remap = 0, 15 do
+					remap[ix_remap] = ix_remap * 2 - x_core + 108
+				end
+				for ix_remap = 16, 27 do
+					remap[ix_remap] = ix_remap - x_core + 74
+				end
+				for ix_remap = 28, 30 do
+					remap[ix_remap] = ix_remap * 2 - x_core + 69
+				end
+				plot.merge_parts(x_core, y_core, parts, reg_r.get_parts(), remap)
+
+				ldtc(instr_fetch_1.x, y_core - 2, instr_fetch_1.x, instr_fetch_1.y, -10000000)
+				ldtc(instr_fetch_2.x, y_core - 2, instr_fetch_2.x, instr_fetch_2.y, -10000000)
+				ldtc(instr_fetch_3.x, y_core - 2, instr_fetch_3.x, instr_fetch_3.y, -10000000)
+				ldtc(instr_fetch_4.x, y_core - 2, instr_fetch_4.x, instr_fetch_4.y, -10000000)
+				part({ type = pt.FILT, x = instr_fetch_1.x, y = y_core - 1 })
+				part({ type = pt.FILT, x = instr_fetch_2.x, y = y_core - 1 })
+				part({ type = pt.FILT, x = instr_fetch_3.x, y = y_core - 1 })
+				part({ type = pt.FILT, x = instr_fetch_4.x, y = y_core - 1 })
+
+				part({ type = pt.CONV, x = instr_fetch_1.x - 2, y = y_core - 1, tmp = pt.FILT, ctype = pt.PSCN })
+				part({ type = pt.CONV, x = instr_fetch_1.x - 2, y = y_core - 1, tmp = pt.PSCN, ctype = pt.SPRK })
+				part({ type = pt.LSNS, x = instr_fetch_1.x - 1, y = y_core    , tmp = 3, tmp2 = 2 })
+				part({ type = pt.FILT, x = instr_fetch_1.x + 1, y = y_core + 1, ctype = 0x10000003 })
+				dray(instr_fetch_1.x - 1, y_core, x_core + 87, y_core, 7, false)
+				local insl = part({ type = pt.INSL, x = instr_fetch_1.x - 1, y = y_core })
+				cray(x_core, y_core, insl.x, insl.y, pt.INSL, 1, false, -10000000)
+				cray(x_core, y_core, insl.x, insl.y, pt.INSL, 1, false,  10000000)
+			end
+
+			for ix_reader = 0, readers - 1 do
+				local x_reader = x_regs + ix_reader * 4 + 3
+
+				local function half(x, y)
+					local output = part({ type = pt.FILT, x = x, y = y })
+					part({ type = pt.LDTC, x = x + 1, y = y })
+					part({ type = pt.LSNS, x = x + 1, y = y - 1, tmp = 3, tmp2 = 2 })
+					return output
+				end
+				local output_lo = half(x_reader    , y_regs)
+				local output_hi = half(x_reader + 2, y_regs)
+
+				-- ldtc(x_reader - 4, y_regs + 4, output_lo.x, output_lo.y)
+				-- ldtc(x_reader - 2, y_regs + 4, output_hi.x, output_hi.y)
+				-- part({ type = pt.FILT, x = x_reader - 5, y = y_regs + 5 })
+				-- part({ type = pt.FILT, x = x_reader - 3, y = y_regs + 5 })
+			end
+
+			local lsns_life = part({ type = pt.FILT, x = alloc_filt(), y = y_decode, ctype = 0x10000003 })
 			local bit_filt = {}
 			for ix_bit = 0, 4 do
-				bit_filt[ix_bit] = part({ type = pt.FILT, x = x_decode + 3 + ix_bit, y = y_decode, ctype = bitx.lshift(1, ix_bit) })
+				bit_filt[ix_bit] = part({ type = pt.FILT, x = alloc_filt(), y = y_decode, ctype = bitx.lshift(1, ix_bit) })
 			end
-			local lsns_life = part({ type = pt.FILT, x = x_decode + 2, y = y_decode, ctype = 0x10000003 })
 
 			local writer_info = {}
 			for ix_writer = 0, writers - 1 do
 				writer_info[ix_writer] = {
-					addr    = part({ type = pt.FILT, x = x_decode +  9 + ix_writer * 3, y = y_decode, ctype = 0x10000005 + ix_writer }),
-					data_lo = part({ type = pt.FILT, x = x_decode + 10 + ix_writer * 3, y = y_decode, ctype = 0x1000FE00 + ix_writer }),
-					data_hi = part({ type = pt.FILT, x = x_decode + 11 + ix_writer * 3, y = y_decode, ctype = 0x1000CA00 + ix_writer }),
+					addr    = part({ type = pt.FILT, x = alloc_filt(), y = y_decode, ctype = 0x10000005 + ix_writer }),
+					data_lo = part({ type = pt.FILT, x = alloc_filt(), y = y_decode, ctype = 0x1000FE00 + ix_writer }),
+					data_hi = part({ type = pt.FILT, x = alloc_filt(), y = y_decode, ctype = 0x1000CA00 + ix_writer }),
 				}
 			end
 
@@ -837,7 +915,7 @@ local function build_internal(params)
 			part({ type = pt.FILT, x = x_decode -  9, y = y_decode })
 			part({ type = pt.FILT, x = x_decode - 10, y = y_decode, tmp = 1, ctype = 0x10000005 })
 			local query_bray =   { x = x_decode - 11, y = y_decode }
-			part({ type = pt.DMND, x = x_decode - 12, y = y_decode })
+			part({ type = pt.DMND, x = x_decode - 12, y = y_decode, unstack = true })
 			part({ type = pt.DMND, x = x_target +  1, y = y_decode })
 
 			for ix_writer = 0, writers - 1 do
@@ -944,36 +1022,6 @@ local function build_internal(params)
 			part({ type = pt.CONV, x = x_decode, y = y_decode, tmp = pt.SPRK, ctype = pt.METL })
 			part({ type = pt.CONV, x = x_decode, y = y_decode, tmp = pt.METL, ctype = pt.SPRK })
 			part({ type = pt.DMND, x = x_decode, y = y_decode })
-
-			local read_from = 3
-			for ix_reader = 0, readers - 1 do
-				local x_reader = x_regs + ix_reader * 4 + 3
-
-				local addr_source_lo = part({ type = pt.FILT, x = x_reader + 5, y = y_regs - 5, ctype = 0x0FFFFFFA - ix_reader * 4 - read_from * 2 + 1 })
-				local addr_source_hi = part({ type = pt.FILT, x = x_reader + 7, y = y_regs - 5, ctype = 0x0FFFFFFA - ix_reader * 4 - read_from * 2     })
-
-				local function half(x, y, source, ballast_type, next_ballast_type, first, last)
-					local output = part({ type = pt.FILT, x = x    , y = y })
-					part({ type = pt.LDTC, x = x + 1, y = y })
-					if first then
-						part({ type = pt.CONV, x = x    , y = y - 1, tmp = pt.FILT, ctype = ballast_type })
-					end
-					if not last then
-						part({ type = pt.CONV, x = x + 1, y = y - 1, tmp = pt.FILT, ctype = next_ballast_type })
-					end
-					part({ type = pt.CONV, x = x + 1, y = y - 1, tmp = ballast_type, ctype = pt.FILT })
-					ldtc(x + 1, y - 1, source.x, source.y)
-					part({ type = pt.LSNS, x = x + 1, y = y - 1, tmp = 3 })
-					return output
-				end
-				local output_lo = half(x_reader    , y_regs, addr_source_lo, pt.CRMC, pt.HEAC, ix_reader == 0, false)
-				local output_hi = half(x_reader + 2, y_regs, addr_source_hi, pt.HEAC, pt.CRMC, false, ix_reader == readers - 1)
-
-				-- ldtc(x_reader - 4, y_regs + 4, output_lo.x, output_lo.y)
-				-- ldtc(x_reader - 2, y_regs + 4, output_hi.x, output_hi.y)
-				-- part({ type = pt.FILT, x = x_reader - 5, y = y_regs + 5 })
-				-- part({ type = pt.FILT, x = x_reader - 3, y = y_regs + 5 })
-			end
 
 			part({ type = pt.INSL, x = x_regs + 2, y = y_regs })
 

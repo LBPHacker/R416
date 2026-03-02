@@ -9,20 +9,25 @@ return testbed.module(function(params)
 	local outputs = {}
 	for ix_instr = 0, instrs - 1 do
 		table.insert(inputs , { name = "instr_" .. ix_instr, index = #inputs  + 1, keepalive = 0x00000001, payload = 0xFFFFFFFE, initial = 0x00000001 })
-		table.insert(outputs, { name = "addr_"  .. ix_instr .. "1a", index = #outputs + 1, keepalive = 0x0FFFFF80, payload = 0x0000007E })
-		table.insert(outputs, { name = "addr_"  .. ix_instr .. "1b", index = #outputs + 1, keepalive = 0x0FFFFF81, payload = 0x0000007E })
-		table.insert(outputs, { name = "addr_"  .. ix_instr .. "2a", index = #outputs + 1, keepalive = 0x0FFFFF80, payload = 0x0000007E })
-		table.insert(outputs, { name = "addr_"  .. ix_instr .. "2b", index = #outputs + 1, keepalive = 0x0FFFFF81, payload = 0x0000007E })
+		table.insert(outputs, { name = "addr_"  .. ix_instr .. "1a", index = #outputs + 1, keepalive = 0x0FFFFF81, payload = 0x0000007E })
+		table.insert(outputs, { name = "addr_"  .. ix_instr .. "1b", index = #outputs + 1, keepalive = 0x0FFFFF80, payload = 0x0000007E })
+		table.insert(outputs, { name = "addr_"  .. ix_instr .. "2a", index = #outputs + 1, keepalive = 0x0FFFFF81, payload = 0x0000007E })
+		table.insert(outputs, { name = "addr_"  .. ix_instr .. "2b", index = #outputs + 1, keepalive = 0x0FFFFF80, payload = 0x0000007E })
 	end
 
 	return {
 		tag = "reg_r",
 		opt_params = {
-			thread_count  = 1,
+			thread_count  = 8,
 			temp_initial  = 1,
 			temp_final    = 0.5,
 			temp_loss     = 1e-6,
 			round_length  = 10000,
+			seed          = { 0x56789ABC, 0x87654321 },
+			schedule = {
+				durations    = { 100000, 200000, 600000,        },
+				temperatures = {     10,      2,      1,    0.5 },
+			},
 		},
 		stacks        = 1,
 		storage_slots = 31,
@@ -37,7 +42,7 @@ return testbed.module(function(params)
 				})
 			end
 			local function const_sub(expr, amount)
-				for ix_bit = 0, 3 do
+				for ix_bit = 0, 4 do
 					local b = bitx.lshift(1, ix_bit)
 					if bitx.band(amount, b) ~= 0 then
 						local expr_sub = expr
@@ -55,14 +60,14 @@ return testbed.module(function(params)
 			for ix_instr = 0, instrs - 1 do
 				local output_1 = regs_outputs[ix_instr].rs1:bxor(0x17FFFFFF)
 				local output_2 = regs_outputs[ix_instr].rs2:bxor(0x17FFFFFF)
-				output_1 = const_sub(output_1, ix_instr * 2 + 2)
-				output_2 = const_sub(output_2, ix_instr * 2 + 2)
+				output_1 = const_sub(output_1, ix_instr * 4 + 2)
+				output_2 = const_sub(output_2, ix_instr * 4 + 4)
 				output_1 = spaghetti.lshiftk(output_1, 1)
 				output_2 = spaghetti.lshiftk(output_2, 1)
-				outputs["addr_" .. ix_instr .. "1a"] = output_1
-				outputs["addr_" .. ix_instr .. "1b"] = output_1:bor(1)
-				outputs["addr_" .. ix_instr .. "2a"] = output_2
-				outputs["addr_" .. ix_instr .. "2b"] = output_2:bor(1)
+				outputs["addr_" .. ix_instr .. "1a"] = output_1:bor(1)
+				outputs["addr_" .. ix_instr .. "1b"] = output_1
+				outputs["addr_" .. ix_instr .. "2a"] = output_2:bor(1)
+				outputs["addr_" .. ix_instr .. "2b"] = output_2
 			end
 			return outputs
 		end,
@@ -88,12 +93,12 @@ return testbed.module(function(params)
 			for ix_instr = 0, instrs - 1 do
 				local output_1 = bitx.band(regs_outputs[ix_instr].rs1, 0x1F)
 				local output_2 = bitx.band(regs_outputs[ix_instr].rs2, 0x1F)
-				output_1 = 0x0FFFFFFA - ix_instr * 4 - output_1 * 2
-				output_2 = 0x0FFFFFFA - ix_instr * 4 - output_2 * 2
-				outputs["addr_"  .. ix_instr .. "1a"] = output_1
-				outputs["addr_"  .. ix_instr .. "1b"] = output_1 + 1
-				outputs["addr_"  .. ix_instr .. "2a"] = output_2
-				outputs["addr_"  .. ix_instr .. "2b"] = output_2 + 1
+				output_1 = 0x0FFFFFFA - ix_instr * 8 - output_1 * 2 
+				output_2 = 0x0FFFFFFA - ix_instr * 8 - output_2 * 2 - 4
+				outputs["addr_"  .. ix_instr .. "1a"] = output_1 + 1
+				outputs["addr_"  .. ix_instr .. "1b"] = output_1
+				outputs["addr_"  .. ix_instr .. "2a"] = output_2 + 1
+				outputs["addr_"  .. ix_instr .. "2b"] = output_2
 			end
 			return outputs
 		end,

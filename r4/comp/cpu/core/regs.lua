@@ -24,14 +24,14 @@ return testbed.module(function(params)
 			{ name = "rd" , index = 5, keepalive = 0x10000000, payload = 0x0000001F },
 		},
 		func = function(inputs)
-			local instr_tame = inputs.instr:bor(0x10000000):bsub(0x80000001):force(0x10000000, 0x6FFFFFFE)
+			local instr_tame = inputs.instr:bor(0x10000000):band(0x3FFFFFFE)
 			local rs1 = spaghetti.rshiftk(instr_tame, 15):bor(0x10000000):band(0x1000001F)
 			local rs2 = spaghetti.rshiftk(instr_tame, 20):bor(0x10000000):band(0x1000001F)
 			local rd  = spaghetti.rshiftk(instr_tame,  7):bor(0x10000000):band(0x1000001F)
 			return {
 				rs1 = rs1,
 				rs2 = rs2,
-				rd  = spaghetti.select(inputs.instr:bxor(0x10):band(0x50):zeroable(), 0x10000000, rd),
+				rd  = spaghetti.select(instr_tame:bxor(0x10):band(0x50):zeroable(), 0x10000000, rd),
 			}
 		end,
 		fuzz_inputs = function()

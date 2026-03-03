@@ -11,25 +11,25 @@ return testbed.module(function(params)
 			temp_final    = 0.5,
 			temp_loss     = 1e-6,
 			round_length  = 10000,
-			seed          = { 0x56789ABC, 0x87654321 },
+			seed          = { 0x56789ABC, 0x87654322 },
 		},
 		stacks        = 1,
-		storage_slots = 28,
+		storage_slots = 30,
 		work_slots    = 9,
 		inputs = {
-			{ name = "pc_lo"         , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-			{ name = "pc_hi"         , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-			{ name = "pc_lo_prev"    , index =  5, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-			{ name = "pc_hi_prev"    , index =  7, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
-			{ name = "addr_lo"       , index =  9, keepalive = 0x10000000, payload = 0x03FFFFFF, initial = 0x10000000 },
-			{ name = "bus_lo"        , index = 11, keepalive = 0x10000000, payload = 0x0003FFFF, initial = 0x10000000 },
-			{ name = "pc_max_row"    , index = 13, keepalive = 0x10000000, payload = 0x0000003F, initial = 0x10000000 },
+			{ name = "pc_lo"         , index = 21, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+			{ name = "pc_hi"         , index = 22, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+			{ name = "pc_lo_prev"    , index = 23, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+			{ name = "pc_hi_prev"    , index = 24, keepalive = 0x10000000, payload = 0x0000FFFF, initial = 0x10000000 },
+			{ name = "addr_lo"       , index =  7, keepalive = 0x10000000, payload = 0x03FFFFFF, initial = 0x10000000 },
+			{ name = "bus_lo"        , index = 15, keepalive = 0x10000000, payload = 0x0003FFFF, initial = 0x10000000 },
+			{ name = "pc_max_row"    , index = 29, keepalive = 0x10000000, payload = 0x0000003F, initial = 0x10000000 },
 		},
 		outputs = {
-			{ name = "pc_lo"         , index =  1, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "pc_hi"         , index =  3, keepalive = 0x10000000, payload = 0x0000FFFF },
-			{ name = "pc_row"        , index =  5, keepalive = 0x10000000, payload = 0x0000007F },
-			{ name = "addr_combined" , index =  7, keepalive = 0x10000000, payload = 0x01FFFFFF },
+			{ name = "pc_lo"         , index = 12, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "pc_hi"         , index = 14, keepalive = 0x10000000, payload = 0x0000FFFF },
+			{ name = "pc_row"        , index = 29, keepalive = 0x10000000, payload = 0x0000007F },
+			{ name = "addr_combined" , index = 30, keepalive = 0x10000000, payload = 0x01FFFFFF },
 		},
 		func = function(inputs)
 			local pc_lo, pc_hi = spaghetti.select(
@@ -52,7 +52,6 @@ return testbed.module(function(params)
 			end
 			pc_row = spaghetti.select(lt_one:band(0x80):zeroable(), inputs.pc_max_row, pc_row:bor(0x10000000):band(0x1000FFFF))
 			pc_row = pc_row:bxor(spaghetti.lshift(0x3FFFFFFE, pc_row:bxor(0xFFFF):bsub(7)):bxor(0x3FFFFFFF):bsub(7))
-			pc_row = pc_row:bxor(spaghetti.lshift(0x3FFFFFFE, pc_row):bxor(0x3FFFFFFF))
 			pc_row:force(0x10000000, 0x0000007F)
 			return {
 				pc_lo         = pc_lo,
@@ -84,7 +83,7 @@ return testbed.module(function(params)
 			return {
 				pc_lo         = bitx.bor(0x10000000, bitx.band(            pc     , 0xFFFF)),
 				pc_hi         = bitx.bor(0x10000000, bitx.band(bitx.rshift(pc, 16), 0xFFFF)),
-				pc_row        = bitx.bor(0x10000000, pc_row + 7),
+				pc_row        = bitx.bor(0x10000000, pc_row + 8),
 				addr_combined = bitx.bor(0x10000000, bitx.band(inputs.addr_lo, 0xFFFF), bitx.lshift(bitx.band(pc, 0x1FF), 16)),
 			}
 		end,

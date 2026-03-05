@@ -83,38 +83,32 @@ local function run(params)
 	local plot_y = params.plot_y or 100
 
 	local specific_sequence
-	-- -- local instr_seq = {}
-	-- -- for i = 1, 20 do
-	-- -- 		table.insert(instr_seq, pick_random({
-	-- -- 			bitx.bor(0x00000010,
-	-- -- 			                     math.random(0x00000000, 0x00000003),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000FFF), 20)),
-	-- -- 			bitx.bor(0x00000030,
-	-- -- 			                     math.random(0x00000000, 0x00000003),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 20),
-	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000007F), 25)),
-	-- -- 		}))
-	-- -- end
-	-- -- table.insert(instr_seq, 0x00000050)
-	-- -- for _, v in ipairs(instr_seq) do
-	-- -- 	print(("0x%08X,"):format(v))
-	-- -- end
-	-- specific_sequence = {
-	-- 	instr_seq = instr_seq,
-	-- 	-- instr_seq = {
-	-- 	-- 	0x105AF993, -- andi   x19, x21, 0x105
-	-- 	-- 	0x84366332, -- or      x6, x12, x3
-	-- 	-- 	0xCAA33F90, -- sltiu  x31,  x6, 0xFFFFFCAA
-	-- 	-- 	0x827FE730, -- mulhsu x14, x31, x7 (really or)
-	-- 	-- 	0x00000050,
-	-- 	-- },
-	-- }
+	if false then
+		local instr_seq = {}
+		if false then
+			for i = 1, 1 do
+				table.insert(instr_seq, pick_random({
+					{ constant = 0x00000010, mask = 0x00000074, weight = 10000 },
+					{ constant = 0x00000030, mask = 0x00000074, weight = 10000 },
+					{ constant = 0x00000050, mask = 0x00000050, weight =     1 },
+					{ constant = 0x00000014, mask = 0x00000054, weight =   100 },
+					{ constant = 0x00000048, mask = 0x00000058, weight =   100 },
+				}))
+			end
+			table.insert(instr_seq, 0x00000050)
+			for _, v in ipairs(instr_seq) do
+				print(("0x%08X,"):format(v))
+			end
+		else
+			instr_seq = {
+				0x630E5AC9,
+				0x00000050,
+			}
+		end
+		specific_sequence = {
+			instr_seq = instr_seq,
+		}
+	end
 
 	local mem_row_count = 37
 	local core_count = 5
@@ -289,16 +283,18 @@ local function run(params)
 		end
 		for i = 0, (mem_row_count * row_size - 1) * 4, 4 do
 			set_mem(i, pick_random({
-				{ constant = 0x00000010, mask = 0x00000074, weight = 1000 },
-				{ constant = 0x00000030, mask = 0x00000074, weight = 1000 },
-				{ constant = 0x00000050, mask = 0x00000050, weight =    1 },
+				{ constant = 0x00000010, mask = 0x00000074, weight = 10000 },
+				{ constant = 0x00000030, mask = 0x00000074, weight = 10000 },
+				{ constant = 0x00000050, mask = 0x00000050, weight =     1 },
+				{ constant = 0x00000014, mask = 0x00000054, weight =   100 },
+				{ constant = 0x00000048, mask = 0x00000058, weight =   100 },
 			}))
 		end
 		for i = 1, reg_count - 1 do
 			set_reg(i, merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
 		end
 		set_pc(merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
-		set_started(true)
+		set_started(true) -- TODO: send in start/stop signals
 		sync_head()
 		until_next_randomize = math.random(50, 200)
 	end

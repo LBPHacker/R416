@@ -25,13 +25,10 @@ return testbed.module(function(params)
 		},
 		func = function(inputs)
 			local instr_tame = inputs.instr:bor(0x10000000):band(0x3FFFFFFE)
-			local rs1 = spaghetti.rshiftk(instr_tame, 15):bor(0x10000000):band(0x1000001F)
-			local rs2 = spaghetti.rshiftk(instr_tame, 20):bor(0x10000000):band(0x1000001F)
-			local rd  = spaghetti.rshiftk(instr_tame,  7):bor(0x10000000):band(0x1000001F)
 			return {
-				rs1 = rs1,
-				rs2 = rs2,
-				rd  = spaghetti.select(instr_tame:bxor(0x10):band(0x50):zeroable(), 0x10000000, rd),
+				rs1 = spaghetti.rshiftk(instr_tame, 15):bor(0x10000000):band(0x1000001F),
+				rs2 = spaghetti.rshiftk(instr_tame, 20):bor(0x10000000):band(0x1000001F),
+				rd  = spaghetti.rshiftk(instr_tame,  7):bor(0x10000000):band(0x1000001F),
 			}
 		end,
 		fuzz_inputs = function()
@@ -40,14 +37,10 @@ return testbed.module(function(params)
 			}
 		end,
 		fuzz_outputs = function(inputs)
-			local writes_reg = bitx.band(inputs.instr, 0x00000050) == 0x00000010
-			local rs1 = bitx.band(bitx.rshift(inputs.instr, 15), 0x1F)
-			local rs2 = bitx.band(bitx.rshift(inputs.instr, 20), 0x1F)
-			local rd  = bitx.band(bitx.rshift(inputs.instr,  7), 0x1F)
 			return {
-				rs1 = bitx.bor(0x10000000, rs1),
-				rs2 = bitx.bor(0x10000000, rs2),
-				rd  = bitx.bor(0x10000000, writes_reg and rd or 0),
+				rs1 = bitx.bor(0x10000000, bitx.band(bitx.rshift(inputs.instr, 15), 0x1F)),
+				rs2 = bitx.bor(0x10000000, bitx.band(bitx.rshift(inputs.instr, 20), 0x1F)),
+				rd  = bitx.bor(0x10000000, bitx.band(bitx.rshift(inputs.instr,  7), 0x1F)),
 			}
 		end,
 	}

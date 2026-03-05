@@ -89,6 +89,10 @@ return testbed.module(function(params, params_name)
 				jaloff_hi = stretch_1:bor(stretch_2):band(0x1000FFFF)
 				jaloff_hi = jaloff_hi:bor(spaghetti.select(jaloff_hi:band(0x10):zeroable(), 0x1000FFE0, 0x10000000))
 			end
+			local incr_pc_outputs = incr_pc.component({
+				lo = inputs.pc_lo,
+				hi = inputs.pc_hi,
+			})
 			local alu_outputs = alu_instance.component({
 				lhs_lo    = inputs.lhs_lo,
 				lhs_hi    = inputs.lhs_hi,
@@ -118,16 +122,19 @@ return testbed.module(function(params, params_name)
 				instr_output = instr_output:band(instr_j):band(instr_l)
 			end
 			local output = defer:bxor(1):bsub(instr_output)
-			local incr_pc_outputs = incr_pc.component({
-				lo = inputs.pc_lo,
-				hi = inputs.pc_hi,
-			})
 			local pc_lo, pc_hi, next_instr, next_lhs_lo, next_lhs_hi, next_rhs_lo, next_rhs_hi
+			local res_lo = alu_outputs.res_lo
+			local res_hi = alu_outputs.res_hi
 			if has_jal then
 				pc_lo, pc_hi = spaghetti.select(
 					defer:band(1):zeroable(),
-					inputs.pc_lo , incr_pc_outputs.lo,
-					inputs.pc_hi , incr_pc_outputs.hi
+					inputs.pc_lo, incr_pc_outputs.lo,
+					inputs.pc_hi, incr_pc_outputs.hi
+				)
+				res_lo, res_hi = spaghetti.select(
+					instr_j:band(1):zeroable(),
+					res_lo, incr_pc_outputs.lo,
+					res_hi, incr_pc_outputs.hi
 				)
 			else
 				pc_lo, pc_hi, next_instr, next_lhs_lo, next_lhs_hi, next_rhs_lo, next_rhs_hi = spaghetti.select(
@@ -142,8 +149,8 @@ return testbed.module(function(params, params_name)
 				)
 			end
 			return {
-				res_lo      = alu_outputs.res_lo,
-				res_hi      = alu_outputs.res_hi,
+				res_lo      = res_lo,
+				res_hi      = res_hi,
 				pc_lo       = pc_lo,
 				pc_hi       = pc_hi,
 				output      = output,
@@ -198,6 +205,7 @@ return testbed.module(function(params, params_name)
 				output = output or instr_jalr or instr_jal or instr_l
 			end
 			local pc = bitx.bor(bitx.band(inputs.pc_lo, 0xFFFF), bitx.lshift(bitx.band(inputs.pc_hi, 0xFFFF), 16))
+			local next_pc = (pc + 4) % 0x100000000
 			local jaloff_lo, jaloff_hi
 			if has_jal then
 				local jaloff = bitx.bor(bitx.lshift(bitx.band(bitx.rshift(inputs.instr, 12), 0x000000FF), 12),
@@ -247,14 +255,20 @@ return testbed.module(function(params, params_name)
 				next_rhs_lo = inputs.next_rhs_lo
 				next_rhs_hi = inputs.next_rhs_hi
 				next_instr  = inputs.next_instr
-				pc = (pc + 4) % 0x100000000
+				pc = next_pc
 			end
 			if defer then
 				output = false
 			end
+			local res_lo = alu_outputs.res_lo
+			local res_hi = alu_outputs.res_hi
+			if has_jal and (instr_jalr or instr_jal) then
+				res_lo = bitx.bor(0x10000000, bitx.band(            next_pc     , 0xFFFF))
+				res_hi = bitx.bor(0x10000000, bitx.band(bitx.rshift(next_pc, 16), 0xFFFF))
+			end
 			return {
-				res_lo      = alu_outputs.res_lo,
-				res_hi      = alu_outputs.res_hi,
+				res_lo      = res_lo,
+				res_hi      = res_hi,
 				pc_lo       = bitx.bor(0x10000000, bitx.band(            pc     , 0xFFFF)),
 				pc_hi       = bitx.bor(0x10000000, bitx.band(bitx.rshift(pc, 16), 0xFFFF)),
 				output      = output and 0x10000001 or 0x10000000,

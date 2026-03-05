@@ -95,6 +95,7 @@ function emu_context_i:eu_()
 		                                   bitx.band(bitx.rshift(instr,  9), 0x00000800),
 		                                   bitx.band(            instr     , 0x000FF000)), 20)
 		local rd_value
+		local next_pc = clamp32(self.pc + 4)
 		if bitx.band(instr, 0x00000074) == 0x00000010 then
 			rd_value = alu_op(
 				bitx.band(bitx.rshift(instr, 12), 7),
@@ -121,8 +122,16 @@ function emu_context_i:eu_()
 			end
 		elseif bitx.band(instr, 0x00000050) == 0x00000050 then
 			self.started = false
-		elseif bitx.band(instr, 0xFFFFFFD8) == 0x00000048 then -- TODO: fake jal, remove
-			break
+		elseif bitx.band(instr, 0x00000054) == 0x00000014 then
+			local lui = bitx.band(instr, 0x00000020) ~= 0
+			rd_value = clamp32(imm_u + (lui and 0 or self.pc))
+		elseif bitx.band(instr, 0x00000058) == 0x00000048 then
+			if not last_subeu then
+				defer()
+				break
+			end
+			rd_value = next_pc
+			next_pc = clamp32(self.pc + imm_j)
 		else
 			error("nyi")
 		end
@@ -130,7 +139,7 @@ function emu_context_i:eu_()
 			self.regs[rd] = rd_value
 			self.reg_writes_[rd] = rd_value
 		end
-		self.pc = clamp32(self.pc + 4)
+		self.pc = next_pc
 	until true end
 end
 

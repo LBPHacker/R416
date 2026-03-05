@@ -85,12 +85,12 @@ return testbed.module(function(params)
 				pc_hi    = inputs.pc_hi,
 			})
 			local pc_lo, pc_hi = spaghetti.select(
-				unit_outputs.taken:bor(instr_jalr:bxor(1)):band(1):zeroable(),
+				unit_outputs.taken:bor(instr_jalr:bxor(1)):bsub(inputs.shutdown):band(1):zeroable(),
 				address_outputs.sum_lo, unit_outputs.pc_lo,
 				address_outputs.sum_hi, unit_outputs.pc_hi
 			)
 			pc_lo, pc_hi = spaghetti.select(
-				instr_jal:band(1):zeroable(),
+				instr_jal:bor(inputs.shutdown):band(1):zeroable(),
 				pc_lo, unit_outputs.jal_lo,
 				pc_hi, unit_outputs.jal_hi
 			)
@@ -174,7 +174,7 @@ return testbed.module(function(params)
 			local branch_lo = instr_jal and unit_outputs.jal_lo or address_outputs.sum_lo
 			local branch_hi = instr_jal and unit_outputs.jal_hi or address_outputs.sum_hi
 			local cbranch_taken = bitx.band(unit_outputs.taken, 1) ~= 0
-			if cbranch_taken or instr_jal or instr_jalr then
+			if bitx.band(defer, 1) == 0 and (cbranch_taken or instr_jal or instr_jalr) then
 				pc_lo = branch_lo
 				pc_hi = branch_hi
 			end

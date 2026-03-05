@@ -21,6 +21,10 @@ local function merge32(value_lo, value_hi)
 	return bitx.bor(value_lo, bitx.lshift(value_hi, 16))
 end
 
+local function random32()
+	return merge32(math.random(0x0000, 0xFFFF), math.random(0x0000, 0xFFFF))
+end
+
 local function detect()
 	local cx, cy, mem_row_count, core_count, machine_id
 	for id in sim.parts() do
@@ -68,8 +72,7 @@ local function pick_random(tbl)
 			weight_sum = weight_sum + item.weight
 		end
 	end
-	local random = merge32(math.random(0x0000, 0xFFFF), math.random(0x0000, 0xFFFF))
-	return bitx.bor(which.constant, bitx.band(random, bitx.bxor(0xFFFFFFFF, which.mask)))
+	return bitx.bor(which.constant, bitx.band(random32(), bitx.bxor(0xFFFFFFFF, which.mask)))
 end
 
 local function run(params)
@@ -86,13 +89,10 @@ local function run(params)
 	if false then
 		local instr_seq = {}
 		if false then
-			for i = 1, 1 do
+			for i = 1, 100 do
 				table.insert(instr_seq, pick_random({
-					{ constant = 0x00000010, mask = 0x00000074, weight = 10000 },
-					{ constant = 0x00000030, mask = 0x00000074, weight = 10000 },
-					{ constant = 0x00000050, mask = 0x00000050, weight =     1 },
-					{ constant = 0x00000014, mask = 0x00000054, weight =   100 },
-					{ constant = 0x00000048, mask = 0x00000058, weight =   100 },
+					{ constant = 0x00000050, mask = 0x00000050, weight = 1 },
+					{ constant = 0x00000040, mask = 0x0000005C, weight = 5 },
 				}))
 			end
 			table.insert(instr_seq, 0x00000050)
@@ -101,8 +101,8 @@ local function run(params)
 			end
 		else
 			instr_seq = {
-				0x630E5AC9,
-				0x00000050,
+				0x5FDFE273,
+				0x0B0307C3,
 			}
 		end
 		specific_sequence = {
@@ -288,12 +288,14 @@ local function run(params)
 				{ constant = 0x00000050, mask = 0x00000050, weight =     1 },
 				{ constant = 0x00000014, mask = 0x00000054, weight =   100 },
 				{ constant = 0x00000048, mask = 0x00000058, weight =   100 },
+				{ constant = 0x00000044, mask = 0x0000005C, weight =   100 },
+				{ constant = 0x00000040, mask = 0x0000005C, weight =   100 },
 			}))
 		end
 		for i = 1, reg_count - 1 do
-			set_reg(i, merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
+			set_reg(i, random32())
 		end
-		set_pc(merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
+		set_pc(random32())
 		set_started(true) -- TODO: send in start/stop signals
 		sync_head()
 		until_next_randomize = math.random(50, 200)

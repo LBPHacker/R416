@@ -66,6 +66,50 @@ local function alu_op(op, lhs, rhs, shamt, sra, sub)
 	return bitx.band(lhs, rhs)
 end
 
+local function cond_op(op, lhs, rhs)
+	local taken
+	local op_high = bitx.band(bitx.rshift(op, 1), 3)
+	if op_high == 2 then
+		taken = signed32(lhs) < signed32(rhs)
+	elseif op_high == 3 then
+		taken = lhs < rhs
+	else
+		taken = lhs == rhs
+	end
+	if bitx.band(op, 1) ~= 0 then
+		taken = not taken
+	end
+	return taken
+end
+
+
+local function imm_i(instr)
+	return sign_extend(         bitx.band(bitx.rshift(instr, 20), 0x00000FFF) , 11)
+end
+
+local function imm_s(instr)
+	return sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 20), 0x00000FE0),
+	                            bitx.band(bitx.rshift(instr,  7), 0x0000001F)), 11)
+end
+
+local function imm_b(instr)
+	return sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 19), 0x00001000),
+	                            bitx.band(bitx.rshift(instr, 20), 0x000007E0),
+	                            bitx.band(bitx.rshift(instr,  7), 0x0000001E),
+	                            bitx.band(bitx.lshift(instr,  4), 0x00000800)), 12)
+end
+
+local function imm_u(instr)
+	return                      bitx.band(            instr     , 0xFFFFF000)
+end
+
+local function imm_j(instr)
+	return sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 11), 0x00100000),
+	                            bitx.band(bitx.rshift(instr, 20), 0x000007FE),
+	                            bitx.band(bitx.rshift(instr,  9), 0x00000800),
+	                            bitx.band(            instr     , 0x000FF000)), 20)
+end
+
 function emu_context_i:eu_()
 	local instrs = self:fetch_()
 	local defer_shift = 0
@@ -82,25 +126,13 @@ function emu_context_i:eu_()
 		local rd    = bitx.band(bitx.rshift(instr,  7), 0x1F)
 		local rs1   = bitx.band(bitx.rshift(instr, 15), 0x1F)
 		local rs2   = bitx.band(bitx.rshift(instr, 20), 0x1F)
-		local imm_i = sign_extend(         bitx.band(bitx.rshift(instr, 20), 0x00000FFF) , 11)
-		local imm_s = sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 20), 0x00000FE0),
-		                                   bitx.band(bitx.rshift(instr,  7), 0x0000001F)), 11)
-		local imm_b = sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 19), 0x00001000),
-		                                   bitx.band(bitx.rshift(instr, 20), 0x000007E0),
-		                                   bitx.band(bitx.rshift(instr,  6), 0x0000001E),
-		                                   bitx.band(bitx.lshift(instr,  4), 0x00000800)), 12)
-		local imm_u =                      bitx.band(            instr     , 0xFFFFF000)
-		local imm_j = sign_extend(bitx.bor(bitx.band(bitx.rshift(instr, 11), 0x00100000),
-		                                   bitx.band(bitx.rshift(instr, 20), 0x000007FE),
-		                                   bitx.band(bitx.rshift(instr,  9), 0x00000800),
-		                                   bitx.band(            instr     , 0x000FF000)), 20)
 		local rd_value
 		local next_pc = clamp32(self.pc + 4)
 		if bitx.band(instr, 0x00000074) == 0x00000010 then
 			rd_value = alu_op(
 				bitx.band(bitx.rshift(instr, 12), 7),
 				self.regs[rs1],
-				imm_i,
+				imm_i(instr),
 				bitx.band(bitx.rshift(instr, 20), 0x1F),
 				bitx.band(instr, 0x40000000) ~= 0,
 				false
@@ -121,17 +153,40 @@ function emu_context_i:eu_()
 				end
 			end
 		elseif bitx.band(instr, 0x00000050) == 0x00000050 then
+			if not last_subeu then
+				defer()
+				break
+			end
 			self.started = false
 		elseif bitx.band(instr, 0x00000054) == 0x00000014 then
 			local lui = bitx.band(instr, 0x00000020) ~= 0
-			rd_value = clamp32(imm_u + (lui and 0 or self.pc))
+			rd_value = clamp32(imm_u(instr) + (lui and 0 or self.pc))
 		elseif bitx.band(instr, 0x00000058) == 0x00000048 then
 			if not last_subeu then
 				defer()
 				break
 			end
 			rd_value = next_pc
-			next_pc = clamp32(self.pc + imm_j)
+			next_pc = clamp32(self.pc + imm_j(instr))
+		elseif bitx.band(instr, 0x0000005C) == 0x00000044 then
+			if not last_subeu then
+				defer()
+				break
+			end
+			rd_value = next_pc
+			next_pc = clamp32(self.regs[rs1] + imm_i(instr))
+		elseif bitx.band(instr, 0x0000005C) == 0x00000040 then
+			if cond_op(
+				bitx.band(bitx.rshift(instr, 12), 7),
+				self.regs[rs1],
+				self.regs[rs2]
+			) then
+				if not last_subeu then
+					defer()
+					break
+				end
+				next_pc = clamp32(self.pc + imm_b(instr))
+			end
 		else
 			error("nyi")
 		end

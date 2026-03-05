@@ -41,8 +41,11 @@ local function signed32(value)
 	return value
 end
 
-local function alu_op(op, lhs, rhs, shamt, sra)
+local function alu_op(op, lhs, rhs, shamt, sra, sub)
 	if op == 0 then
+		if sub then
+			return clamp32(lhs - rhs)
+		end
 		return clamp32(lhs + rhs)
 	elseif op == 1 then
 		return bitx.lshift(lhs, bitx.band(rhs, 0x1F))
@@ -65,8 +68,17 @@ end
 
 function emu_context_i:eu_()
 	local instrs = self:fetch_()
-	for ix_subeu = 0, sub_eu_count - 1 do
-		local instr = instrs[ix_subeu]
+	local defer_shift = 0
+	local function defer()
+		defer_shift = defer_shift + 1
+	end
+	for ix_subeu = 0, sub_eu_count - 1 do repeat
+		if not self.started then
+			defer()
+			break
+		end
+		local last_subeu = ix_subeu == sub_eu_count - 1
+		local instr = instrs[ix_subeu - defer_shift]
 		local rd    = bitx.band(bitx.rshift(instr,  7), 0x1F)
 		local rs1   = bitx.band(bitx.rshift(instr, 15), 0x1F)
 		local rs2   = bitx.band(bitx.rshift(instr, 20), 0x1F)
@@ -89,19 +101,37 @@ function emu_context_i:eu_()
 				self.regs[rs1],
 				imm_i,
 				bitx.band(bitx.rshift(instr, 20), 0x1F),
+				bitx.band(instr, 0x40000000) ~= 0,
+				false
+			)
+		elseif bitx.band(instr, 0x00000074) == 0x00000030 then
+			rd_value = alu_op(
+				bitx.band(bitx.rshift(instr, 12), 7),
+				self.regs[rs1],
+				self.regs[rs2],
+				self.regs[rs2],
+				bitx.band(instr, 0x40000000) ~= 0,
 				bitx.band(instr, 0x40000000) ~= 0
 			)
+			if bitx.band(instr, 0x02000000) ~= 0 then -- TODO: implement mul
+				if not last_subeu then
+					defer()
+					break
+				end
+			end
+		elseif bitx.band(instr, 0x00000050) == 0x00000050 then
+			self.started = false
+		elseif bitx.band(instr, 0xFFFFFFD8) == 0x00000048 then -- TODO: fake jal, remove
+			break
 		else
 			error("nyi")
 		end
-		if self.started then
-			if rd ~= 0 then
-				self.regs[rd] = rd_value
-				self.reg_writes_[rd] = rd_value
-			end
+		if rd_value and rd ~= 0 then
+			self.regs[rd] = rd_value
+			self.reg_writes_[rd] = rd_value
 		end
 		self.pc = clamp32(self.pc + 4)
-	end
+	until true end
 end
 
 emu_context_i.frame = misc.user_wrap(function(self, start_action)

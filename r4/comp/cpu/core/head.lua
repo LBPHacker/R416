@@ -7,8 +7,7 @@ local instr_split     = require("r4.comp.cpu.core.instr_split")    .instantiate(
 local regs            = require("r4.comp.cpu.core.regs")           .instantiate()
 
 return testbed.module(function(params)
-	local unit_first  = unit.instantiate({ unit_type = "f" }, "?")
-	local unit_middle = unit.instantiate({ unit_type = "m" }, "?")
+	local unit_firstmiddle = unit.instantiate({ unit_type = "fm" }, "?")
 
 	local units = 3
 	local inputs = {
@@ -58,79 +57,75 @@ return testbed.module(function(params)
 		outputs       = outputs,
 		clobbers      = { 68, 70, 72, 74, 76, 78, 88, 90, 92, 93 },
 		func = function(inputs)
-			local regs_outputs = {}
+			local outputs = {}
 			for ix_unit = 0, units do
-				regs_outputs[ix_unit] = regs.component({
+				local regs_outputs = regs.component({
 					instr = inputs["instr_" .. ix_unit],
 				})
-			end
-			local outputs = {}
-			local pc_lo = inputs.pc_lo
-			local pc_hi = inputs.pc_hi
-			for ix_unit = 0, units - 1 do
-				local instr = inputs["instr_"  .. ix_unit]
+				for ix_prev_unit = 0, ix_unit - 1 do
+					local iw_lhs_outputs = internal_writer.component({
+						rs     = regs_outputs.rs1,
+						rs_lo  = inputs["lhs_lo_" .. ix_unit],
+						rs_hi  = inputs["lhs_hi_" .. ix_unit],
+						rw     = outputs["res_rd_" .. ix_prev_unit],
+						rw_lo  = outputs["res_lo_" .. ix_prev_unit],
+						rw_hi  = outputs["res_hi_" .. ix_prev_unit],
+					})
+					local iw_rhs_outputs = internal_writer.component({
+						rs     = regs_outputs.rs2,
+						rs_lo  = inputs["rhs_lo_" .. ix_unit],
+						rs_hi  = inputs["rhs_hi_" .. ix_unit],
+						rw     = outputs["res_rd_" .. ix_prev_unit],
+						rw_lo  = outputs["res_lo_" .. ix_prev_unit],
+						rw_hi  = outputs["res_hi_" .. ix_prev_unit],
+					})
+					inputs["lhs_lo_" .. ix_unit] = iw_lhs_outputs.rs_lo
+					inputs["lhs_hi_" .. ix_unit] = iw_lhs_outputs.rs_hi
+					inputs["rhs_lo_" .. ix_unit] = iw_rhs_outputs.rs_lo
+					inputs["rhs_hi_" .. ix_unit] = iw_rhs_outputs.rs_hi
+				end
+				if ix_unit == units then
+					break
+				end
 				local instr_split_outputs = instr_split.component({
-					instr = instr,
+					instr = inputs["instr_"  .. ix_unit],
 				})
-				local unit_outputs = (ix_unit == 0 and unit_first or unit_middle).component({
+				local ix_next_unit = ix_unit + 1
+				local unit_outputs = unit_firstmiddle.component({
 					lhs_lo      = inputs["lhs_lo_" .. ix_unit],
 					lhs_hi      = inputs["lhs_hi_" .. ix_unit],
 					rhs_lo      = inputs["rhs_lo_" .. ix_unit],
 					rhs_hi      = inputs["rhs_hi_" .. ix_unit],
-					pc_lo       = pc_lo,
-					pc_hi       = pc_hi,
+					pc_lo       = inputs.pc_lo,
+					pc_hi       = inputs.pc_hi,
 					defer       = inputs.defer,
-					instr       = instr,
+					instr       = inputs["instr_"  .. ix_unit],
 					instr_lo    = instr_split_outputs.instr_lo,
 					instr_hi    = instr_split_outputs.instr_hi,
-					next_lhs_lo = inputs["lhs_lo_" .. (ix_unit + 1)],
-					next_lhs_hi = inputs["lhs_hi_" .. (ix_unit + 1)],
-					next_rhs_lo = inputs["rhs_lo_" .. (ix_unit + 1)],
-					next_rhs_hi = inputs["rhs_hi_" .. (ix_unit + 1)],
-					next_instr  = inputs["instr_"  .. (ix_unit + 1)],
+					next_lhs_lo = inputs["lhs_lo_" .. ix_next_unit],
+					next_lhs_hi = inputs["lhs_hi_" .. ix_next_unit],
+					next_rhs_lo = inputs["rhs_lo_" .. ix_next_unit],
+					next_rhs_hi = inputs["rhs_hi_" .. ix_next_unit],
+					next_instr  = inputs["instr_"  .. ix_next_unit],
 				})
-				inputs["lhs_lo_" .. (ix_unit + 1)] = unit_outputs.next_lhs_lo
-				inputs["lhs_hi_" .. (ix_unit + 1)] = unit_outputs.next_lhs_hi
-				inputs["rhs_lo_" .. (ix_unit + 1)] = unit_outputs.next_rhs_lo
-				inputs["rhs_hi_" .. (ix_unit + 1)] = unit_outputs.next_rhs_hi
-				inputs["instr_"  .. (ix_unit + 1)] = unit_outputs.next_instr
-				pc_lo  = unit_outputs.pc_lo
-				pc_hi  = unit_outputs.pc_hi
+				inputs["lhs_lo_" .. ix_next_unit] = unit_outputs.next_lhs_lo
+				inputs["lhs_hi_" .. ix_next_unit] = unit_outputs.next_lhs_hi
+				inputs["rhs_lo_" .. ix_next_unit] = unit_outputs.next_rhs_lo
+				inputs["rhs_hi_" .. ix_next_unit] = unit_outputs.next_rhs_hi
+				inputs["instr_"  .. ix_next_unit] = unit_outputs.next_instr
+				inputs.pc_lo = unit_outputs.pc_lo
+				inputs.pc_hi = unit_outputs.pc_hi
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
-				outputs["res_rd_" .. ix_unit] = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs[ix_unit].rd, 0x10000000)
-				for ix_next_unit = ix_unit + 1, units do
-					local iw_lhs_outputs = internal_writer.component({
-						rs     = regs_outputs[ix_next_unit].rs1,
-						rs_lo  = inputs["lhs_lo_" .. ix_next_unit],
-						rs_hi  = inputs["lhs_hi_" .. ix_next_unit],
-						rw     = regs_outputs[ix_unit].rd,
-						rw_lo  = unit_outputs.res_lo,
-						rw_hi  = unit_outputs.res_hi,
-						output = unit_outputs.output,
-					})
-					local iw_rhs_outputs = internal_writer.component({
-						rs     = regs_outputs[ix_next_unit].rs2,
-						rs_lo  = inputs["rhs_lo_" .. ix_next_unit],
-						rs_hi  = inputs["rhs_hi_" .. ix_next_unit],
-						rw     = regs_outputs[ix_unit].rd,
-						rw_lo  = unit_outputs.res_lo,
-						rw_hi  = unit_outputs.res_hi,
-						output = unit_outputs.output,
-					})
-					inputs["lhs_lo_" .. ix_next_unit] = iw_lhs_outputs.rs_lo
-					inputs["lhs_hi_" .. ix_next_unit] = iw_lhs_outputs.rs_hi
-					inputs["rhs_lo_" .. ix_next_unit] = iw_rhs_outputs.rs_lo
-					inputs["rhs_hi_" .. ix_next_unit] = iw_rhs_outputs.rs_hi
-				end
+				outputs["res_rd_" .. ix_unit] = spaghetti.select(unit_outputs.output:band(1):zeroable(), regs_outputs.rd, 0x10000000)
 			end
 			outputs["lhs_lo_" .. units] = inputs["lhs_lo_" .. units]
 			outputs["lhs_hi_" .. units] = inputs["lhs_hi_" .. units]
 			outputs["rhs_lo_" .. units] = inputs["rhs_lo_" .. units]
 			outputs["rhs_hi_" .. units] = inputs["rhs_hi_" .. units]
 			outputs["instr_"  .. units] = inputs["instr_"  .. units]
-			outputs.pc_lo = pc_lo
-			outputs.pc_hi = pc_hi
+			outputs.pc_lo = inputs.pc_lo
+			outputs.pc_hi = inputs.pc_hi
 			return outputs
 		end,
 		fuzz_inputs = function()
@@ -154,95 +149,90 @@ return testbed.module(function(params)
 			return inputs
 		end,
 		fuzz_outputs = function(inputs)
-			local regs_outputs = {}
+			local outputs = {}
 			for ix_unit = 0, units do
-				local err
-				regs_outputs[ix_unit], err = regs.fuzz_outputs({
+				local regs_outputs, err = regs.fuzz_outputs({
 					instr = inputs["instr_" .. ix_unit],
 				})
-				if not regs_outputs[ix_unit] then
+				if not regs_outputs then
 					return nil, "regs/" .. ix_unit .. ": " .. err
 				end
-			end
-			local outputs = {}
-			local pc_lo = inputs.pc_lo
-			local pc_hi = inputs.pc_hi
-			for ix_unit = 0, units - 1 do
-				local instr = inputs["instr_"  .. ix_unit]
+				for ix_prev_unit = 0, ix_unit - 1 do
+					local iw_lhs_outputs, err = internal_writer.fuzz_outputs({
+						rs     = regs_outputs.rs1,
+						rs_lo  = inputs["lhs_lo_" .. ix_unit],
+						rs_hi  = inputs["lhs_hi_" .. ix_unit],
+						rw     = outputs["res_rd_" .. ix_prev_unit],
+						rw_lo  = outputs["res_lo_" .. ix_prev_unit],
+						rw_hi  = outputs["res_hi_" .. ix_prev_unit],
+					})
+					if not iw_lhs_outputs then
+						return nil, "internal_writer/" .. ix_unit .. "/" .. ix_prev_unit .. "/lhs: " .. err
+					end
+					local iw_rhs_outputs, err = internal_writer.fuzz_outputs({
+						rs     = regs_outputs.rs2,
+						rs_lo  = inputs["rhs_lo_" .. ix_unit],
+						rs_hi  = inputs["rhs_hi_" .. ix_unit],
+						rw     = outputs["res_rd_" .. ix_prev_unit],
+						rw_lo  = outputs["res_lo_" .. ix_prev_unit],
+						rw_hi  = outputs["res_hi_" .. ix_prev_unit],
+					})
+					if not iw_rhs_outputs then
+						return nil, "internal_writer/" .. ix_unit .. "/" .. ix_prev_unit .. "/rhs: " .. err
+					end
+					inputs["lhs_lo_" .. ix_unit] = iw_lhs_outputs.rs_lo
+					inputs["lhs_hi_" .. ix_unit] = iw_lhs_outputs.rs_hi
+					inputs["rhs_lo_" .. ix_unit] = iw_rhs_outputs.rs_lo
+					inputs["rhs_hi_" .. ix_unit] = iw_rhs_outputs.rs_hi
+				end
+				if ix_unit == units then
+					break
+				end
 				local instr_split_outputs, err = instr_split.fuzz_outputs({
-					instr = instr,
+					instr = inputs["instr_"  .. ix_unit],
 				})
 				if not instr_split_outputs then
 					return nil, "instr_split/" .. ix_unit .. ": " .. err
 				end
-				local unit_outputs, err = (ix_unit == 0 and unit_first or unit_middle).fuzz_outputs({
+				local ix_next_unit = ix_unit + 1
+				local unit_outputs, err = unit_firstmiddle.fuzz_outputs({
 					lhs_lo      = inputs["lhs_lo_" .. ix_unit],
 					lhs_hi      = inputs["lhs_hi_" .. ix_unit],
 					rhs_lo      = inputs["rhs_lo_" .. ix_unit],
 					rhs_hi      = inputs["rhs_hi_" .. ix_unit],
-					pc_lo       = pc_lo,
-					pc_hi       = pc_hi,
+					pc_lo       = inputs.pc_lo,
+					pc_hi       = inputs.pc_hi,
 					defer       = inputs.defer,
-					instr       = instr,
+					instr       = inputs["instr_"  .. ix_unit],
 					instr_lo    = instr_split_outputs.instr_lo,
 					instr_hi    = instr_split_outputs.instr_hi,
-					next_lhs_lo = inputs["lhs_lo_" .. (ix_unit + 1)],
-					next_lhs_hi = inputs["lhs_hi_" .. (ix_unit + 1)],
-					next_rhs_lo = inputs["rhs_lo_" .. (ix_unit + 1)],
-					next_rhs_hi = inputs["rhs_hi_" .. (ix_unit + 1)],
-					next_instr  = inputs["instr_"  .. (ix_unit + 1)],
+					next_lhs_lo = inputs["lhs_lo_" .. ix_next_unit],
+					next_lhs_hi = inputs["lhs_hi_" .. ix_next_unit],
+					next_rhs_lo = inputs["rhs_lo_" .. ix_next_unit],
+					next_rhs_hi = inputs["rhs_hi_" .. ix_next_unit],
+					next_instr  = inputs["instr_"  .. ix_next_unit],
 				})
 				if not unit_outputs then
 					return nil, "unit/" .. ix_unit .. ": " .. err
 				end
-				inputs["lhs_lo_" .. (ix_unit + 1)] = unit_outputs.next_lhs_lo
-				inputs["lhs_hi_" .. (ix_unit + 1)] = unit_outputs.next_lhs_hi
-				inputs["rhs_lo_" .. (ix_unit + 1)] = unit_outputs.next_rhs_lo
-				inputs["rhs_hi_" .. (ix_unit + 1)] = unit_outputs.next_rhs_hi
-				inputs["instr_"  .. (ix_unit + 1)] = unit_outputs.next_instr
-				pc_lo = unit_outputs.pc_lo
-				pc_hi = unit_outputs.pc_hi
+				inputs["lhs_lo_" .. ix_next_unit] = unit_outputs.next_lhs_lo
+				inputs["lhs_hi_" .. ix_next_unit] = unit_outputs.next_lhs_hi
+				inputs["rhs_lo_" .. ix_next_unit] = unit_outputs.next_rhs_lo
+				inputs["rhs_hi_" .. ix_next_unit] = unit_outputs.next_rhs_hi
+				inputs["instr_"  .. ix_next_unit] = unit_outputs.next_instr
+				inputs.pc_lo = unit_outputs.pc_lo
+				inputs.pc_hi = unit_outputs.pc_hi
 				outputs["res_lo_" .. ix_unit] = unit_outputs.res_lo
 				outputs["res_hi_" .. ix_unit] = unit_outputs.res_hi
-				outputs["res_rd_" .. ix_unit] = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs[ix_unit].rd or 0x10000000
-				for ix_next_unit = ix_unit + 1, units do
-					local iw_lhs_outputs, err = internal_writer.fuzz_outputs({
-						rs     = regs_outputs[ix_next_unit].rs1,
-						rs_lo  = inputs["lhs_lo_" .. ix_next_unit],
-						rs_hi  = inputs["lhs_hi_" .. ix_next_unit],
-						rw     = regs_outputs[ix_unit].rd,
-						rw_lo  = unit_outputs.res_lo,
-						rw_hi  = unit_outputs.res_hi,
-						output = unit_outputs.output,
-					})
-					if not iw_lhs_outputs then
-						return nil, "internal_writer/" .. ix_unit .. "/" .. ix_next_unit .. "/lhs: " .. err
-					end
-					local iw_rhs_outputs, err = internal_writer.fuzz_outputs({
-						rs     = regs_outputs[ix_next_unit].rs2,
-						rs_lo  = inputs["rhs_lo_" .. ix_next_unit],
-						rs_hi  = inputs["rhs_hi_" .. ix_next_unit],
-						rw     = regs_outputs[ix_unit].rd,
-						rw_lo  = unit_outputs.res_lo,
-						rw_hi  = unit_outputs.res_hi,
-						output = unit_outputs.output,
-					})
-					if not iw_rhs_outputs then
-						return nil, "internal_writer/" .. ix_unit .. "/" .. ix_next_unit .. "/rhs: " .. err
-					end
-					inputs["lhs_lo_" .. ix_next_unit] = iw_lhs_outputs.rs_lo
-					inputs["lhs_hi_" .. ix_next_unit] = iw_lhs_outputs.rs_hi
-					inputs["rhs_lo_" .. ix_next_unit] = iw_rhs_outputs.rs_lo
-					inputs["rhs_hi_" .. ix_next_unit] = iw_rhs_outputs.rs_hi
-				end
+				outputs["res_rd_" .. ix_unit] = bitx.band(unit_outputs.output, 1) ~= 0 and regs_outputs.rd or 0x10000000
 			end
 			outputs["lhs_lo_" .. units] = inputs["lhs_lo_" .. units]
 			outputs["lhs_hi_" .. units] = inputs["lhs_hi_" .. units]
 			outputs["rhs_lo_" .. units] = inputs["rhs_lo_" .. units]
 			outputs["rhs_hi_" .. units] = inputs["rhs_hi_" .. units]
 			outputs["instr_"  .. units] = inputs["instr_"  .. units]
-			outputs.pc_lo = pc_lo
-			outputs.pc_hi = pc_hi
+			outputs.pc_lo = inputs.pc_lo
+			outputs.pc_hi = inputs.pc_hi
 			return outputs
 		end,
 	}

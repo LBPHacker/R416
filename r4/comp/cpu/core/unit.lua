@@ -7,7 +7,7 @@ local cbranch   = require("r4.comp.cpu.core.cbranch").instantiate()
 local incr_pc   = require("r4.comp.cpu.core.incr_pc").instantiate()
 
 return testbed.module(function(params, params_name)
-	check.one_of(params_name .. ".unit_type", params.unit_type, { "f", "m", "l" })
+	check.one_of(params_name .. ".unit_type", params.unit_type, { "fm", "l" })
 	local has_jal = params.unit_type == "l"
 
 	local alu_instance = alu.instantiate(params, params_name)

@@ -62,8 +62,42 @@ local function run(params)
 	local plot_x = params.plot_x or 100
 	local plot_y = params.plot_y or 100
 
+	local specific_sequence
+	-- -- local instr_seq = {}
+	-- -- for i = 1, 20 do
+	-- -- 		table.insert(instr_seq, pick_random({
+	-- -- 			bitx.bor(0x00000010,
+	-- -- 			                     math.random(0x00000000, 0x00000003),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000FFF), 20)),
+	-- -- 			bitx.bor(0x00000030,
+	-- -- 			                     math.random(0x00000000, 0x00000003),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000001F), 20),
+	-- -- 			         bitx.lshift(math.random(0x00000000, 0x0000007F), 25)),
+	-- -- 		}))
+	-- -- end
+	-- -- table.insert(instr_seq, 0x00000050)
+	-- -- for _, v in ipairs(instr_seq) do
+	-- -- 	print(("0x%08X,"):format(v))
+	-- -- end
+	-- specific_sequence = {
+	-- 	instr_seq = instr_seq,
+	-- 	-- instr_seq = {
+	-- 	-- 	0x105AF993, -- andi   x19, x21, 0x105
+	-- 	-- 	0x84366332, -- or      x6, x12, x3
+	-- 	-- 	0xCAA33F90, -- sltiu  x31,  x6, 0xFFFFFCAA
+	-- 	-- 	0x827FE730, -- mulhsu x14, x31, x7 (really or)
+	-- 	-- 	0x00000050,
+	-- 	-- },
+	-- }
+
 	local mem_row_count = 37
-	local core_count = 3
+	local core_count = 5
 	local machine_id = 0xDEAD
 
 	r4plot.run({
@@ -80,7 +114,7 @@ local function run(params)
 	})
 	local cx, cy
 	do
-		local mem_row_count_d, core_count_d, machine_id_d = detect()
+		local mem_row_count_d, core_count_d, machine_id_d
 		cx, cy, mem_row_count_d, core_count_d, machine_id_d = detect()
 		assert(mem_row_count == mem_row_count_d)
 		assert(core_count == core_count_d)
@@ -163,21 +197,32 @@ local function run(params)
 		       sim.partID(cx + 127, y_head)
 	end
 	local function set_pc(value)
+		emu.pc = value
 		local pc_lo_id, pc_hi_id = pc_id()
 		local pc_lo, pc_hi = split32(value)
 		sim.partProperty(pc_lo_id, "ctype", bitx.bor(0x10000000, pc_lo))
 		sim.partProperty(pc_hi_id, "ctype", bitx.bor(0x10000000, pc_hi))
 	end
+	local function compare_pc()
+		local pc_lo_id, pc_hi_id = pc_id()
+		local expected = emu.pc
+		local got = merge32(bitx.band(sim.partProperty(pc_lo_id, "ctype"), 0xFFFF),
+		                    bitx.band(sim.partProperty(pc_hi_id, "ctype"), 0xFFFF))
+		if expected ~= got then
+			fail(("pc expected to be 0x%08X, is actually 0x%08X"):format(expected, got))
+		end
+	end
 	local function started_id()
 		return sim.partID(cx + 129, y_head)
 	end
 	local function set_started(value)
+		emu.started = value
 		sim.partProperty(started_id(), "ctype", bitx.bor(0x10000000, value and 0 or 1))
 	end
 	local function compare_started(expected)
 		local got = (sim.partProperty(started_id(), "ctype") == 0x10000000)
 		if expected ~= got then
-			fail(("started expected to be %s, is actually %s"):format(addr, tostring(expected), tostring(got)))
+			fail(("started expected to be %s, is actually %s"):format(tostring(expected), tostring(got)))
 		end
 	end
 
@@ -201,17 +246,53 @@ local function run(params)
 
 	local until_next_randomize
 	local function randomize()
+		if specific_sequence then
+			if not specific_sequence.mem then
+				specific_sequence.mem = {}
+				for index, value in ipairs(specific_sequence.instr_seq) do
+					specific_sequence.mem[(index - 1) * 4] = value
+				end
+			end
+			for i = 0, (mem_row_count * row_size - 1) * 4, 4 do
+				set_mem(i, (specific_sequence.mem and specific_sequence.mem[i]) or 0x00000013)
+			end
+			for i = 1, reg_count - 1 do
+				set_reg(i, (specific_sequence.regs and specific_sequence.regs[i]) or 0)
+			end
+			set_pc(specific_sequence.pc or 0)
+			if specific_sequence.started == nil then
+				specific_sequence.started = true
+			end
+			set_started(specific_sequence.started)
+			sync_head()
+			until_next_randomize = nil
+			return
+		end
 		for i = 0, (mem_row_count * row_size - 1) * 4, 4 do
-			set_mem(i, bitx.bor(0x00000013,
-			                    -- bitx.lshift(pick_random({ 0, 1, 2, 3, 4, 5, 6, 7 }), 12),
-			                    bitx.lshift(math.random(0, 7), 12),
-			                    bitx.lshift(math.random(0, 0x1F), 7),
-			                    bitx.lshift(math.random(0, 0x1F), 15),
-			                    bitx.lshift(math.random(0, 0xFFF), 20)))
+			set_mem(i, pick_random({
+				bitx.bor(0x00000010,
+				                     math.random(0x00000000, 0x00000003),
+				         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
+				         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
+				         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
+				         bitx.lshift(math.random(0x00000000, 0x00000FFF), 20)),
+				bitx.bor(0x00000030,
+				                     math.random(0x00000000, 0x00000003),
+				         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
+				         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
+				         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
+				         bitx.lshift(math.random(0x00000000, 0x0000001F), 20),
+				         bitx.lshift(math.random(0x00000000, 0x0000007F), 25)),
+				-- bitx.bor(0x00000050,
+				--                      math.random(0x00000000, 0x0000FFFF),
+				--          bitx.lshift(math.random(0x00000000, 0x0000FFFF), 16)),
+			}))
 		end
 		for i = 1, reg_count - 1 do
-			set_reg(i, 0x00000000)
+			set_reg(i, merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
 		end
+		set_pc(merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
+		-- TODO: set_started
 		sync_head()
 		until_next_randomize = math.random(50, 200)
 	end
@@ -231,6 +312,17 @@ local function run(params)
 		end
 	end
 
+	local function compare_all()
+		for i = 0, (mem_row_count * row_size - 1) * 4, 4 do
+			compare_mem(i, emu.mem[i])
+		end
+		for i = 1, reg_count - 1 do
+			compare_reg(i, emu.regs[i])
+		end
+		compare_started(emu.started)
+		compare_pc()
+	end
+
 	local function aftersim()
 		frames_done = frames_done + 1
 		local frame_result = emu:frame("none")
@@ -241,9 +333,18 @@ local function run(params)
 			compare_mem(addr, value)
 		end
 		compare_started(frame_result.started)
-		until_next_randomize = until_next_randomize - 1
-		if until_next_randomize == 0 then
-			randomize()
+		compare_pc()
+		if specific_sequence then
+			compare_all()
+			if not emu.started then
+				fail("reached end of specific sequence")
+			end
+		end
+		if until_next_randomize then
+			until_next_randomize = until_next_randomize - 1
+			if until_next_randomize == 0 then
+				randomize()
+			end
 		end
 	end
 

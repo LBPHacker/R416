@@ -49,7 +49,27 @@ local function detect()
 end
 
 local function pick_random(tbl)
-	return tbl[math.random(1, #tbl)]
+	local which_weight
+	do
+		local weight_sum = 0
+		for _, item in ipairs(tbl) do
+			weight_sum = weight_sum + item.weight
+		end
+		which_weight = math.random(0, weight_sum - 1)
+	end
+	local which
+	do
+		local weight_sum = 0
+		for _, item in ipairs(tbl) do
+			if which_weight >= weight_sum and which_weight < weight_sum + item.weight then
+				which = item
+				break
+			end
+			weight_sum = weight_sum + item.weight
+		end
+	end
+	local random = merge32(math.random(0x0000, 0xFFFF), math.random(0x0000, 0xFFFF))
+	return bitx.bor(which.constant, bitx.band(random, bitx.bxor(0xFFFFFFFF, which.mask)))
 end
 
 local function run(params)
@@ -126,7 +146,6 @@ local function run(params)
 		mem_row_count = mem_row_count,
 		core_count    = core_count,
 	})
-	emu.started = true -- TODO: remove
 
 	local pause_asap = false
 	local frames_done = 0
@@ -270,29 +289,16 @@ local function run(params)
 		end
 		for i = 0, (mem_row_count * row_size - 1) * 4, 4 do
 			set_mem(i, pick_random({
-				bitx.bor(0x00000010,
-				                     math.random(0x00000000, 0x00000003),
-				         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
-				         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
-				         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
-				         bitx.lshift(math.random(0x00000000, 0x00000FFF), 20)),
-				bitx.bor(0x00000030,
-				                     math.random(0x00000000, 0x00000003),
-				         bitx.lshift(math.random(0x00000000, 0x00000007), 12),
-				         bitx.lshift(math.random(0x00000000, 0x0000001F),  7),
-				         bitx.lshift(math.random(0x00000000, 0x0000001F), 15),
-				         bitx.lshift(math.random(0x00000000, 0x0000001F), 20),
-				         bitx.lshift(math.random(0x00000000, 0x0000007F), 25)),
-				-- bitx.bor(0x00000050,
-				--                      math.random(0x00000000, 0x0000FFFF),
-				--          bitx.lshift(math.random(0x00000000, 0x0000FFFF), 16)),
+				{ constant = 0x00000010, mask = 0x00000074, weight = 1000 },
+				{ constant = 0x00000030, mask = 0x00000074, weight = 1000 },
+				{ constant = 0x00000050, mask = 0x00000050, weight =    1 },
 			}))
 		end
 		for i = 1, reg_count - 1 do
 			set_reg(i, merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
 		end
 		set_pc(merge32(math.random(0, 0xFFFF), math.random(0, 0xFFFF)))
-		-- TODO: set_started
+		set_started(true)
 		sync_head()
 		until_next_randomize = math.random(50, 200)
 	end

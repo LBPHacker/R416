@@ -16,6 +16,9 @@ local function build_internal(params)
 	if params.machine_id ~= nil then
 		check.integer("params.machine_id", params.machine_id)
 	end
+	if params.start_pc ~= nil then
+		check.integer_range("params.start_pc", params.start_pc, 0x00000000, 0xFFFFFFFF)
+	end
 
 	local parts = {}
 
@@ -38,6 +41,7 @@ local function build_internal(params)
 	local height           = params.mem_row_count
 	local width_order      = 7
 	local max_height_order = 6
+	local start_pc         = params.start_pc or 0x00000000
 
 	local x_body = 10
 	local y_body = 10
@@ -60,6 +64,8 @@ local function build_internal(params)
 		end
 		return y_usage_next
 	end
+
+	local memory_life_aray
 	do -- memory
 		local function memory32(p, value)
 			local bray = bitx.band(value, 1) ~= 0
@@ -68,11 +74,13 @@ local function build_internal(params)
 				life    = bray and     988 or 4,
 				tmp     = bray and       1 or 0,
 				ctype   = bitx.bor(bitx.band(value, 0xFFFFFFFE), 1),
+				dcolour = 0x00000000,
 			})
 		end
 
 		local width = bitx.lshift(1, width_order)
 		local height_order = misc.ilog2ceil(height)
+		local last_life_aray
 		for y = 0, height - 1 do
 			for x = 0, width - 1 do
 				local scrambled = bitx.bor(
@@ -94,15 +102,13 @@ local function build_internal(params)
 				last_filt.dcolour = 0xFFFFFFFF
 				last_dmnd.dcolour = 0xFFFFFFFF
 			end
-			part({ type = pt.STOR, x = x_body - 1, y = y_body + y })
-			local y_aray = y_body + (height - 1 - y)
-			aray(x_body - 2 - ((y + 1) % 2 * 3), y_aray, -1, 0, pt.METL, nil, 988)
-			if y % 2 == 0 then
-				part({ type = pt.STOR, x = x_body - 2, y = y_aray })
-				part({ type = pt.STOR, x = x_body - 3, y = y_aray })
-				part({ type = pt.STOR, x = x_body - 4, y = y_aray })
-			end
+			local grate_ctype = y % 2 == 1 and 0x20000000 or 0x2000
+			part({ type = pt.FILT, x = x_body - 1, y = y_body + y, ctype = grate_ctype, tmp = 1 })
+			part({ type = pt.FILT, x = x_body - 2, y = y_body + y, ctype = grate_ctype })
+			part({ type = pt.ARAY, x = x_body - 3, y = y_body + y, life = 988 })
+			last_life_aray = spark({ type = pt.METL, x = x_body - 4, y = y_body + y, life = 4 })
 		end
+		memory_life_aray = last_life_aray
 
 		local apom_count = 0
 		local apom_prev, apom_next, apom_parts
@@ -355,8 +361,6 @@ local function build_internal(params)
 			local x_usage      = x_body
 			local y_usage      = y_ix_eu(ix_eu)
 			local y_usage_next = y_ix_eu_next(ix_eu)
-
-			-- local address_source = part({ type = pt.FILT, x = x_body - 2, y = y_usage - 5, tmp = 1, ctype = 0x11BA0BAD }) -- TODO
 
 			local function assert_identical(a, b)
 				local function one_way(x, y)
@@ -805,9 +809,14 @@ local function build_internal(params)
 					cray(x_cray, y_cleanup + ix_put % 2, x_cray, y_ix_eu     (ix_eu), pt.HEAC, 1, pt.PSCN)
 				end
 			end
+			cray(memory_life_aray.x, y_cleanup - 5, memory_life_aray.x, memory_life_aray.y, pt.METL, height, pt.PSCN)
+			cray(memory_life_aray.x, y_cleanup - 5, memory_life_aray.x, memory_life_aray.y, pt.METL, height, pt.PSCN)
+			cray(memory_life_aray.x, y_cleanup + 1, memory_life_aray.x, memory_life_aray.y, pt.SPRK, height, false)
+			solid_spark(memory_life_aray.x + 1, y_cleanup + 2, -1, 0, pt.INWR)
 		end
 	end
 
+	local set_pc_lo, set_pc_hi, get_shutdown
 	do -- register access
 		local regs        = 32
 		local writers     = 4
@@ -1251,6 +1260,7 @@ local function build_internal(params)
 			local target_pc_lo = part({ type = pt.FILT, x = x_regs + 2, y = y_reader })
 			local target_pc_hi = part({ type = pt.FILT, x = x_regs + 4, y = y_reader })
 			local target_defer = part({ type = pt.FILT, x = x_regs + 6, y = y_reader })
+			set_pc_lo, set_pc_hi, get_shutdown = target_pc_lo, target_pc_hi, target_defer
 			dray(target_pc_lo.x, target_pc_lo.y + 1, target_pc_lo.x, target_pc_lo.y - eu_spacing * eus, 1, pt.PSCN)
 			dray(target_pc_hi.x, target_pc_hi.y + 1, target_pc_hi.x, target_pc_hi.y - eu_spacing * eus, 1, pt.PSCN)
 			local y_target_defer = target_defer.y - eu_spacing * eus
@@ -1330,6 +1340,84 @@ local function build_internal(params)
 		end
 		push(0)
 		push(checksum)
+	end
+
+	do -- buttons
+		local x_buttons = x_body + 50
+		local y_buttons = y_ix_eu(eus - 1) + 10
+		local start = part({ type = pt.FILT, x = x_buttons + 34, y = y_buttons - 1, ctype = 0x10000000 })
+		part({ type = pt.LDTC, x = x_buttons + 35, y = y_buttons     })
+		part({ type = pt.FILT, x = x_buttons + 36, y = y_buttons + 1, ctype = 0x10000000 })
+		dray(start.x, start.y + 1, start.x, start.y - 14, 1, pt.PSCN)
+
+		local x_reset = x_buttons - 22
+		local y_reset = y_buttons - 3
+		part ({ type = pt.FILT, x = x_reset    , y = y_reset    , ctype = bitx.bor(0x10000000, bitx.band(            start_pc     , 0xFFFF)) })
+		part ({ type = pt.FILT, x = x_reset + 4, y = y_reset    , ctype = bitx.bor(0x10000000, bitx.band(bitx.rshift(start_pc, 16), 0xFFFF)) })
+		spark({ type = pt.PSCN, x = x_reset - 2, y = y_reset    , life = 3 })
+		spark({ type = pt.PSCN, x = x_reset + 2, y = y_reset    , life = 3 })
+		part ({ type = pt.LSNS, x = x_reset - 1, y = y_reset + 1, tmp = 3, tmp2 = 2 })
+		part ({ type = pt.LSNS, x = x_reset + 1, y = y_reset + 1, tmp = 3 })
+		part ({ type = pt.FILT, x = x_reset    , y = y_reset + 1, ctype = 0x10000003 })
+		part ({ type = pt.CONV, x = x_reset + 2, y = y_reset + 2, tmp = pt.FILT, ctype = pt.HEAC })
+		local reset_replace = part({ type = pt.HEAC, x = x_reset + 1, y = y_reset + 2 })
+		dray(x_reset - 1, y_reset, set_pc_lo.x, set_pc_lo.y, 1, false)
+		dray(x_reset + 3, y_reset, set_pc_hi.x, set_pc_hi.y, 1, false)
+
+		local function button(x_button, ptype, dcolour, set_start, reset)
+			for x = 0, 7 do
+				for y = 0, 3 do
+					if not (y == 0 and (x == 0 or x == 7)) then
+						part({ type = ptype, x = x_button + x, y = y_buttons + y, dcolour = dcolour })
+					end
+				end
+			end
+			if set_start then
+				part({ type = pt.FILT, x = x_button + 8, y = y_buttons - 1, ctype = set_start })
+				dray(x_button + 7, y_buttons - 1, start.x, start.y, 1, false)
+				part({ type = pt.PSCN, x = x_button + 6, y = y_buttons - 1 })
+				part({ type = pt.METL, x = x_button + 5, y = y_buttons - 1 })
+				part({ type = pt.NSCN, x = x_button + 4, y = y_buttons - 1 })
+			end
+			if reset then
+				part({ type = pt.FILT, x = x_button - 1, y = y_buttons - 1, ctype = 0x10000004 })
+				dray(x_button, y_buttons - 1, reset_replace.x, reset_replace.y, 1, false)
+				part({ type = pt.PSCN, x = x_button + 1, y = y_buttons - 1 })
+				part({ type = pt.METL, x = x_button + 2, y = y_buttons - 1 })
+				part({ type = pt.NSCN, x = x_button + 3, y = y_buttons - 1 })
+			end
+			if ptype == pt.LCRY then
+				return spark({ type = pt.NSCN, x = x_button, y = y_buttons - 1, life = 3 })
+			end
+		end
+		button(x_buttons     , pt.INST, 0xFF7F7F7F, nil, true)
+		button(x_buttons + 11, pt.INST, 0xFF7F7F7F, 0x10000002)
+		button(x_buttons + 22, pt.INST, 0xFF7F7F7F, 0x10000001)
+		local shutdown_target = button(x_buttons + 37, pt.LCRY, 0xFF00FF00)
+
+		local x_shutdown = x_buttons - 25
+		ldtc(x_shutdown, y_buttons - 3, get_shutdown.x, get_shutdown.y)
+		local source = part({ type = pt.FILT, x = x_shutdown - 1, y = y_buttons - 3 })
+		do
+			local x_process = x_shutdown + 3
+			local y_process = y_buttons + 1
+			ldtc(x_process - 1, y_process - 1, source.x, source.y)
+			aray(x_process - 1, y_process, -1, 0, pt.METL, nil, 1)
+			part({ type = pt.FILT, x = x_process    , y = y_process })
+			part({ type = pt.FILT, x = x_process + 1, y = y_process, tmp = 1, ctype = 1 })
+			part({ type = pt.FILT, x = x_process + 2, y = y_process, ctype = 0x10000003 })
+			local output = part({ type = pt.BRAY, x = x_process + 3, y = y_process, life = 1 })
+			part({ type = pt.FILT, x = x_process + 4, y = y_process, ctype = 0x10000004 })
+			aray(x_process + 5, y_process, 1, 0, pt.METL, nil, 1)
+			local function spark_source(x_source, ptype)
+				solid_spark(x_source, y_process - 1, 0, -1, ptype)
+				dray(x_source - 2, y_process - 2, shutdown_target.x - 1, shutdown_target.y, 2, false)
+				lsns_spark({ type = pt.PSCN, x = x_source - 3, y = y_process - 2, life = 4 }, 0, 1, -1, 2)
+			end
+			ldtc(x_process + 14, y_process, output.x, output.y)
+			spark_source(x_process + 19, pt.PSCN)
+			spark_source(x_process + 13, pt.NSCN)
+		end
 	end
 
 	ucontext.frame(x_body - 31, y_body - 1, x_body + 134, y_body + eus * eu_spacing + height + 18)

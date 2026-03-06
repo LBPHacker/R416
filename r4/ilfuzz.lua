@@ -142,7 +142,7 @@ local function run(params)
 
 	local save_snap
 	local auto_snap = false
-	local always_compare_all = false
+	local always_compare_all = true
 	local auto_unpause = true
 	local load_snap_path -- = "r4ilfuzz.1772743024.state"
 
@@ -327,6 +327,7 @@ local function run(params)
 	end
 
 	local until_next_randomize
+	local until_next_restart
 	local function randomize()
 		if specific_sequence then
 			if not specific_sequence.mem then
@@ -348,6 +349,7 @@ local function run(params)
 			set_started(specific_sequence.started)
 			sync_head()
 			until_next_randomize = nil
+			until_next_restart = nil
 			return
 		end
 		if load_snap_path then
@@ -373,7 +375,7 @@ local function run(params)
 			set_reg(i, random32())
 		end
 		set_pc(random32())
-		set_started(true) -- TODO: send in start/stop signals
+		set_started(math.random(1, 10) == 1)
 		sync_head()
 		until_next_randomize = math.random(50, 200)
 	end
@@ -404,9 +406,22 @@ local function run(params)
 		compare_pc()
 	end
 
+	local next_emu_start_action = "none"
+	local function set_next_start_action(start_action)
+		local ctype = 0x10000000
+		if start_action == "start" then
+			ctype = 0x10000001
+		elseif start_action == "stop" then
+			ctype = 0x10000002
+		end
+		sim.partProperty(sim.partID(cx + 112, cy - 18), "ctype", ctype)
+		next_emu_start_action = start_action
+	end
+
 	local function aftersim()
 		frames_done = frames_done + 1
-		local frame_result = emu:frame("none")
+		local frame_result = emu:frame(next_emu_start_action)
+		next_emu_start_action = "none"
 		if always_compare_all then
 			compare_all()
 		end
@@ -428,25 +443,32 @@ local function run(params)
 				fail("reached end of specific sequence")
 			end
 		end
+		if not until_next_restart and not emu.started then
+			until_next_restart = math.random(5, 10)
+		end
+		if emu.started and math.random(1, 1000) == 1 then
+			set_next_start_action("stop")
+		end
 		if until_next_randomize then
 			until_next_randomize = until_next_randomize - 1
 			if until_next_randomize == 0 then
 				randomize()
 			end
 		end
-	end
-
-	local function aftersimdraw()
-		-- TODO
+		if until_next_restart then
+			until_next_restart = until_next_restart - 1
+			if until_next_restart == 0 then
+				set_next_start_action("start")
+				until_next_restart = nil
+			end
+		end
 	end
 
 	event.register(event.TICK, tick)
 	event.register(event.AFTERSIM, aftersim)
-	event.register(event.AFTERSIMDRAW, aftersimdraw)
 	local function unregister()
 		event.unregister(event.TICK, tick)
 		event.unregister(event.AFTERSIM, aftersim)
-		event.unregister(event.AFTERSIMDRAW, aftersimdraw)
 	end
 	_G[global_key] = {
 		unregister = unregister,

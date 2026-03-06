@@ -311,13 +311,12 @@ emu_context_i.frame = misc.user_wrap(function(self, start_action)
 	check.one_of("start_action", start_action, { "start", "stop", "none" })
 	for ix_eu = 0, self.core_count_ - 1 do
 		self:eu_(ix_eu)
-		-- if start_action == "start" then -- TODO: enable
-		-- 	self.started = true
-		-- end
-		-- if start_action == "stop" then
-		-- 	self.started = false
-		-- end
-		start_action = "none"
+	end
+	if start_action == "start" then
+		self.started = true
+	end
+	if start_action == "stop" then
+		self.started = false
 	end
 	local result = {
 		started    = self.started,

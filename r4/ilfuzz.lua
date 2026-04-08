@@ -3,7 +3,7 @@ local plot         = require("spaghetti.plot")
 local bitx         = require("spaghetti.bitx")
 local emulator     = require("r4.emulator")
 local disassembler = require("r4.disassembler")
-local r4plot       = require("r4.plot")
+local r4_cpu       = require("r4.comp.cpu")
 local common       = require("r4.common")
 
 local pt = plot.pt
@@ -198,19 +198,21 @@ local function run(params)
 		end
 	end
 
-	r4plot.run({
-		x             = plot_x,
-		y             = plot_y,
-		clear_sim     = true,
-		mem_row_count = mem_row_count,
-		core_types    = core_types,
-		machine_id    = machine_id,
-		extra_parts   = extra_parts,
-		-- debug_stacks = {
-		-- 	x = 40,
-		-- 	y = 40,
-		-- },
+	sim.clearSim()
+	sim.paused(true)
+	sim.heatSim(false)
+	sim.newtonianGravity(false)
+	sim.ambientHeatSim(false)
+	sim.waterEqualization(0)
+	sim.airMode(sim.AIR_OFF)
+	sim.gravityMode(sim.GRAV_OFF)
+	local cpu_parts = r4_cpu.build_internal({
+		memory_rows = mem_row_count,
+		cores       = core_types,
+		machine_id  = machine_id,
 	})
+	plot.merge_parts(0, 0, cpu_parts, extra_parts)
+	plot.create_parts(plot_x, plot_y, cpu_parts)
 	local y_head = cy - 4 - core_count * core_size
 
 	local pause_asap = false

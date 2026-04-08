@@ -11,28 +11,28 @@ local multiplier  = require("r4.comp.cpu.core.alu.generated_multiplier")
 
 local audited_pairs = pairs
 
-local function build_internal(params)
-	check.integer_range("params.mem_row_count", params.mem_row_count, 1, 64)
+local function build_internal(params, params_name)
+	check.integer_range(("%s.memory_rows"):format(params_name), params.memory_rows, 1, 64)
 	local eus, core_types_str
-	if type(params.core_types) == "number" then
-		check.integer_range("params.core_types", params.core_types, 1, 50)
-		eus = params.core_types
-		core_types_str = ("m"):rep(params.core_types)
+	if type(params.cores) == "number" then
+		check.integer_range(("%s.cores"):format(params_name), params.cores, 1, 50)
+		eus = params.cores
+		core_types_str = ("m"):rep(params.cores)
 	else
-		check.string("params.core_types", params.core_types)
-		check.integer_range("#params.core_types", #params.core_types, 1, 50)
-		for ix_core = 1, #params.core_types do
-			local core_type = params.core_types:sub(ix_core, ix_core)
-			check.one_of(("params.core_types character %i"):format(ix_core), core_type, { "i", "m" })
+		check.string(("%s.cores"):format(params_name), params.cores)
+		check.integer_range(("#%s.cores"):format(params_name), #params.cores, 1, 50)
+		for ix_core = 1, #params.cores do
+			local core_type = params.cores:sub(ix_core, ix_core)
+			check.one_of(("%s.cores character %i"):format(params_name, ix_core), core_type, { "i", "m" })
 		end
-		eus = #params.core_types
-		core_types_str = params.core_types
+		eus = #params.cores
+		core_types_str = params.cores
 	end
 	if params.machine_id ~= nil then
-		check.integer("params.machine_id", params.machine_id)
+		check.integer(("%s.machine_id"):format(params_name), params.machine_id)
 	end
 	if params.start_pc ~= nil then
-		check.integer_range("params.start_pc", params.start_pc, 0x00000000, 0xFFFFFFFF)
+		check.integer_range(("%s.start_pc"):format(params_name), params.start_pc, 0x00000000, 0xFFFFFFFF)
 	end
 	local core_types = {}
 	for ix_eu = 0, eus - 1 do
@@ -56,7 +56,7 @@ local function build_internal(params)
 
 	local machine_id       = params.machine_id or 0x1337
 	local eu_spacing       = 16
-	local height           = params.mem_row_count
+	local height           = params.memory_rows
 	local width_order      = 7
 	local max_height_order = 6
 	local start_pc         = params.start_pc or 0x00000000
@@ -1500,11 +1500,70 @@ local function build_internal(params)
 		end
 	end
 
-	ucontext.frame(x_body - 31, y_body - 1, x_body + 134, y_body + eus * eu_spacing + height + 18)
+	local x1 = x_body - 31
+	local y1 = y_body - 1
+	local x2 = x_body + 134
+	local y2 = y_body + eus * eu_spacing + height + 18
+	ucontext.frame(x1, y1, x2, y2)
 
-	return parts
+	return parts, { x1 = x1, y1 = y1, x2 = x2, y2 = y2 }
+end
+
+local function build(params, params_name)
+	local parts_internal, frame = build_internal(params, params_name)
+	local xoff, yoff
+	if params.x.which == "left" then
+		xoff = params.x.value - (frame.x1 - 1)
+	else
+		xoff = params.x.value - (frame.x2 + 1)
+	end
+	if params.y.which == "top" then
+		yoff = params.y.value - (frame.y1 - 1)
+	else
+		yoff = params.y.value - (frame.y2 + 1)
+	end
+	local parts = {}
+	plot.merge_parts(xoff, yoff, parts, parts_internal)
+	local buses = {}
+	for i = 1, #params.cores do
+		table.insert(buses, {
+			x = xoff + frame.x2 + 2,
+			y = yoff + frame.y2 - 19 - (#params.cores - i) * 16,
+		})
+	end
+	return {
+		parts = parts,
+		areas = {
+			{
+				type = "solid",
+				name = "body",
+				x    = xoff + frame.x1 - 1,
+				y    = yoff + frame.y1 - 1,
+				w    = frame.x2 - frame.x1 + 3,
+				h    = frame.y2 - frame.y1 + 3,
+			},
+		},
+		buses = buses,
+	}
+end
+
+local function param_types()
+	return {
+		x = {
+			type = "lowhigh",
+			low  = "left",
+			high = "right",
+		},
+		y = {
+			type = "lowhigh",
+			low  = "top",
+			high = "bottom",
+		},
+	}
 end
 
 return {
+	build          = build,
 	build_internal = build_internal,
+	param_types    = param_types,
 }

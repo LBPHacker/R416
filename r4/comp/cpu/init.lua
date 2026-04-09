@@ -105,7 +105,9 @@ local function build_internal(params, params_name)
 					bitx.band(bitx.rshift(x, 6), 0x01),
 					bitx.band(bitx.lshift(x, 1), 0x7E)
 				)
-				part(memory32({ x = x_body + scrambled, y = y_body + (height - y - 1) }, bitx.bor(0x00013, bitx.lshift(bitx.band(y * width + x, 0xFFF), 20))))
+				local index = y * width + x
+				local value = params.memory and params.memory[index] or bitx.bor(0x00013, bitx.lshift(bitx.band(index, 0xFFF), 20))
+				part(memory32({ x = x_body + scrambled, y = y_body + (height - y - 1) }, value))
 			end
 			local x_dmnd = x_body + width
 			local last_filt
@@ -1444,7 +1446,7 @@ local function build_internal(params, params_name)
 		dray(x_reset - 1, y_reset, set_pc_lo.x, set_pc_lo.y, 1, false)
 		dray(x_reset + 3, y_reset, set_pc_hi.x, set_pc_hi.y, 1, false)
 
-		local function button(x_button, ptype, dcolour, set_start, reset)
+		local function button(x_button, ptype, dcolour, set_start, reset, auto_press)
 			for x = 0, 7 do
 				for y = 0, 3 do
 					if not (y == 0 and (x == 0 or x == 7)) then
@@ -1457,7 +1459,12 @@ local function build_internal(params, params_name)
 				dray(x_button + 7, y_buttons - 1, start.x, start.y, 1, false)
 				part({ type = pt.PSCN, x = x_button + 6, y = y_buttons - 1 })
 				part({ type = pt.METL, x = x_button + 5, y = y_buttons - 1 })
-				part({ type = pt.NSCN, x = x_button + 4, y = y_buttons - 1 })
+				local start = part({ type = pt.NSCN, x = x_button + 4, y = y_buttons - 1 })
+				if auto_press then
+					start.ctype = start.type
+					start.type = pt.SPRK
+					start.life = 4
+				end
 			end
 			if reset then
 				part({ type = pt.FILT, x = x_button - 1, y = y_buttons - 1, ctype = 0x10000004 })
@@ -1472,7 +1479,7 @@ local function build_internal(params, params_name)
 		end
 		button(x_buttons     , pt.INST, 0xFF7F7F7F, nil, true)
 		button(x_buttons + 11, pt.INST, 0xFF7F7F7F, 0x10000002)
-		button(x_buttons + 22, pt.INST, 0xFF7F7F7F, 0x10000001)
+		button(x_buttons + 22, pt.INST, 0xFF7F7F7F, 0x10000001, nil, params.auto_start)
 		local shutdown_target = button(x_buttons + 37, pt.LCRY, 0xFF00FF00)
 
 		local x_shutdown = x_buttons - 25

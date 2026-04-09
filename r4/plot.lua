@@ -8,7 +8,8 @@ local pt = plot.pt
 local audited_pairs = pairs
 
 local components_by_type = {
-	cpu = require("r4.comp.cpu"),
+	cpu       = require("r4.comp.cpu"),
+	r3_bus = require("r4.comp.r3_bus"),
 }
 local valid_types = {}
 for key in audited_pairs(components_by_type) do
@@ -31,11 +32,13 @@ local function place_components(x_top, y_top, components_name, components, debug
 		if component.type == "cpu" then
 			check.integer_range(component_name .. ".memory_base", component.memory_base, 0x000000, 0xFFFFFF)
 			r4_check.base_address(component_name .. ".memory_base", component.memory_base, memory_mask)
+			component.memory_mask = memory_mask
 			check.string(component_name .. ".cores", component.cores)
 			local component_buses = {}
 			for ix_core = 1, #component.cores do
 				table.insert(component_buses, {
 					through_areas = {},
+					cpu           = component,
 				})
 			end
 			buses[ix_component] = component_buses
@@ -111,14 +114,16 @@ local function place_components(x_top, y_top, components_name, components, debug
 				local component_name = ("%s[%i]"):format(components_name, ix_component)
 				local build_info = components_by_type[component.type].build(component_to_new_params[component], component_name)
 				for _, area in ipairs(build_info.areas) do
-					add_area({
+					local new_area = {
 						type = area.type,
 						name = component.name .. "." .. area.name,
 						x    = area.x,
 						y    = area.y,
 						w    = area.w,
 						h    = area.h,
-					})
+					}
+					add_area(new_area)
+					area.successor = new_area
 				end
 				plot.merge_parts(0, 0, relative_parts, build_info.parts)
 				if component.type == "cpu" then
@@ -166,34 +171,43 @@ local function place_components(x_top, y_top, components_name, components, debug
 					return lhs.x < rhs.x
 				end)
 				local last_x = bus.x
+				local needs_termination = true
 				for ix_area, area in ipairs(bus.through_areas) do
 					add_section(last_x, area.x - 1, ix_area - 1, 0)
 					last_x = area.x + area.w
+					if area.terminates_bus then
+						if ix_area ~= #bus.through_areas then
+							area.successor.terminates_bus_wrong = true
+						end
+						needs_termination = false
+					end
 				end
 				local termination_parts = bus_termination.build({
 					debug_stacks = debug_stacks,
-					memory_mask  = memory_mask,
+					memory_mask  = component.memory_mask,
 					memory_base  = component.memory_base,
 				})
 				local bus_termination_x = last_x
 				local bus_termination_w = 12
 				local bus_termination_shift = 0
-				if #bus.through_areas > 0 then
-					local extra_width = 4
-					add_section(last_x, last_x + extra_width - 1, #bus.through_areas, 2)
-					bus_termination_x = bus_termination_x + extra_width
-					bus_termination_w = bus_termination_w + 2
-					bus_termination_shift = 2
+				if needs_termination then
+					if #bus.through_areas > 0 then
+						local extra_width = 4
+						add_section(last_x, last_x + extra_width - 1, #bus.through_areas, 2)
+						bus_termination_x = bus_termination_x + extra_width
+						bus_termination_w = bus_termination_w + 2
+						bus_termination_shift = 2
+					end
+					plot.merge_parts(bus_termination_x + bus_termination_shift, bus.y, bus_parts, termination_parts)
+					add_area({
+						type = "solid",
+						name = component.name .. ".bus" .. (ix_bus - 1) .. ".termination",
+						x    = bus_termination_x,
+						y    = bus.y - 2,
+						w    = bus_termination_w,
+						h    = 9,
+					})
 				end
-				plot.merge_parts(bus_termination_x + bus_termination_shift, bus.y, bus_parts, termination_parts)
-				add_area({
-					type = "solid",
-					name = component.name .. ".bus" .. (ix_bus - 1) .. ".termination",
-					x    = bus_termination_x,
-					y    = bus.y - 2,
-					w    = bus_termination_w,
-					h    = 9,
-				})
 				plot.merge_parts(0, 0, relative_parts, bus_parts)
 				last_empty = #bus.through_areas == 0
 			end
@@ -203,6 +217,10 @@ local function place_components(x_top, y_top, components_name, components, debug
 		local err
 		local coverage = {}
 		for ix_area, area in ipairs(areas) do
+			if area.terminates_bus_wrong then
+				err = ("area %s terminates its bus wrong"):format(area.name)
+				break
+			end
 			if area.w < 0 or area.h < 0 then
 				err = ("area %s has negative dimensions"):format(area.name)
 				break
@@ -271,7 +289,7 @@ local function run(params)
 	local aftersimdraw
 	local tick
 	if params.debug_stacks then
-		local aftersimdraw_user_stacks = plot.aftersimdraw_user_stacks(params.debug_stacks.x, params.debug_stacks.y, x, y, parts)
+		local aftersimdraw_user_stacks = plot.aftersimdraw_user_stacks(params.debug_stacks.x, params.debug_stacks.y, 0, 0, parts)
 		local prev_tick = tick
 		tick = function()
 			aftersimdraw_user_stacks()

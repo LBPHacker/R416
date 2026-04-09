@@ -1,9 +1,9 @@
 local bitx = require("spaghetti.bitx")
 local plot = require("spaghetti.plot")
 
-local function build(params)
-	local pt = plot.pt
-	local parts = {}
+local pt = plot.pt
+
+local function build_internal(parts, params)
 	local ucontext = plot.common_structures(parts, params.debug_stacks and true or false)
 	local dray = ucontext.dray
 	local part = ucontext.part
@@ -39,6 +39,17 @@ local function build(params)
 	part({ type = pt.FILT, x = 1, y = 4 })
 	part({ type = pt.LDTC, x = 2, y = 4, life = 1, tmp = 1 })
 	part({ type = pt.FILT, x = 4, y = 4, ctype = 0x1000FFFF })
+end
+
+local function build(params)
+	local parts = {}
+	local ucontext = plot.common_structures(parts, params.debug_stacks and true or false)
+	local part = ucontext.part
+
+	build_internal(parts, {
+		memory_mask = params.memory_mask,
+		memory_base = params.memory_base,
+	})
 
 	for x = -1, 10 do
 		part({ type = pt.DMND, x = x, y = -2, unstack = true })
@@ -66,5 +77,6 @@ local function build(params)
 end
 
 return {
-	build = build,
+	build_internal = build_internal,
+	build          = build,
 }

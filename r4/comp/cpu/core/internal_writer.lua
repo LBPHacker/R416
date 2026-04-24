@@ -28,16 +28,14 @@ return testbed.module(function(params)
 			{ name = "rs_hi", index = 3, keepalive = 0x10000000, payload = 0x0000FFFF },
 		},
 		func = function(inputs)
-			local rw_lo, rw_hi = spaghetti.select(
-				inputs.rw:band(0x1F):zeroable(),
-				inputs.rw_lo, 0x10000000,
-				inputs.rw_hi, 0x10000000
-			)
-			local rs_lo, rs_hi = spaghetti.select(
-				inputs.rs:bor(0x20000000):bxor(inputs.rw):band(0x1F):zeroable(),
-				inputs.rs_lo, rw_lo,
-				inputs.rs_hi, rw_hi
-			)
+			local zmask = spaghetti.constant(0x3FFFFFFF):lshift(spaghetti.constant(0x1000FFFF):rshift(inputs.rw:bor(0x10000)):never_zero():bor(0x10000):bsub(0xFFFE))
+			local rw_lo = inputs.rw_lo:band(zmask)
+			local rw_hi = inputs.rw_hi:band(zmask)
+			local wmask = spaghetti.constant(0x3FFFFFFF):lshift(spaghetti.constant(0x1000FFFF):rshift(inputs.rs:bor(0x20000000):bxor(inputs.rw):bor(0x10000)):never_zero():bor(0x10000):bsub(0xFFFE))
+			local diff_lo = rw_lo:bor(0x20000000):bxor(inputs.rs_lo)
+			local diff_hi = rw_hi:bor(0x20000000):bxor(inputs.rs_hi)
+			local rs_lo = rw_lo:bor(0x20000000):bxor(diff_lo:band(wmask))
+			local rs_hi = rw_hi:bor(0x20000000):bxor(diff_hi:band(wmask))
 			return {
 				rs_lo = rs_lo,
 				rs_hi = rs_hi,

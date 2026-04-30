@@ -106,6 +106,7 @@ local function build_internal(params, params_name)
 		return y_usage_next
 	end
 
+	local memory_stats
 	local memory_life_aray
 	do -- memory
 		local function memory32(p, value)
@@ -122,6 +123,17 @@ local function build_internal(params, params_name)
 		local width = bitx.lshift(1, width_order)
 		local height_order = misc.ilog2ceil(height)
 		local last_life_aray
+		if memory_contents then
+			local used = 0
+			while memory_contents[used] do
+				used = used + 1
+			end
+			local available = width * height
+			memory_stats = {
+				used      = used,
+				available = available,
+			}
+		end
 		for y = 0, height - 1 do
 			for x = 0, width - 1 do
 				local scrambled = bitx.bor(
@@ -1544,11 +1556,11 @@ local function build_internal(params, params_name)
 	local y2 = y_body + eus * eu_spacing + height + 18
 	ucontext.frame(x1, y1, x2, y2)
 
-	return parts, { x1 = x1, y1 = y1, x2 = x2, y2 = y2 }
+	return parts, { x1 = x1, y1 = y1, x2 = x2, y2 = y2 }, memory_stats
 end
 
 local function build(params, params_name)
-	local parts_internal, frame = build_internal(params, params_name)
+	local parts_internal, frame, memory_stats = build_internal(params, params_name)
 	local xoff, yoff
 	if params.x.which == "left" then
 		xoff = params.x.value - (frame.x1 - 1)
@@ -1582,6 +1594,7 @@ local function build(params, params_name)
 			},
 		},
 		buses = buses,
+		memory_stats = memory_stats,
 	}
 end
 

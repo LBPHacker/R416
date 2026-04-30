@@ -16,6 +16,10 @@ for key in audited_pairs(components_by_type) do
 	table.insert(valid_types, key)
 end
 
+local function tagged_print(err, message)
+	print(("\b%s[r4plot]\14 %s"):format(err and "l" or "t", message))
+end
+
 local function place_components(x_top, y_top, components_name, components, debug_stacks, debug_areas)
 	local memory_mask = 0xFF8000
 	local name_to_component_index = {}
@@ -132,6 +136,12 @@ local function place_components(x_top, y_top, components_name, components, debug
 						component_buses[ix_bus].x = bus.x
 						component_buses[ix_bus].y = bus.y
 					end
+					if build_info.memory_stats then
+						local used      = build_info.memory_stats.used
+						local available = build_info.memory_stats.available
+						local overflow  = used > available
+						tagged_print(overflow, ("%s memory usage: %i out of %i bytes (%.2f%%%s)"):format(component.name, used * 4, available * 4, used / available * 100, overflow and ", overflow!" or ""))
+					end
 				end
 				for dependent_index in audited_pairs(component_order_backward[ix_component]) do
 					component_order_forward[dependent_index][ix_component] = nil
@@ -247,9 +257,9 @@ local function place_components(x_top, y_top, components_name, components, debug
 			end
 		end
 		if err then
-			print("\bl[r3plot]\14 " .. err)
+			tagged_print(true, err)
 			if not debug_areas then
-				print("\bt[r3plot]\14 area debug view enabled automatically")
+				tagged_print(false, "area debug view enabled automatically")
 				debug_areas = true
 			end
 			for _, part in ipairs(relative_parts) do
@@ -368,7 +378,7 @@ local function run(params)
 		unregister = unregister,
 	}
 	rawset(_G, "r4plot", r4plot)
-	print("\bt[r4plot]\14 done")
+	tagged_print(false, "done")
 end
 
 return {

@@ -3,7 +3,7 @@ local plot            = require("spaghetti.plot")
 local misc            = require("spaghetti.misc")
 local check           = require("spaghetti.check")
 local r4_check        = require("r4.check")
-local bus_termination = require("r4.comp.bus_termination")
+local bus_termination = require("r4.comp.bus.termination")
 local top             = require("r4.comp.r3_bus.generated_top")
 local bottom          = require("r4.comp.r3_bus.generated_bottom")
 
